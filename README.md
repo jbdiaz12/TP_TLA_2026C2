@@ -6,6 +6,10 @@
 
 A base compiler example, developed with Flex and Bison.
 
+## Authors
+* Jesus Gabriel Bastidas Diaz(L 64475)- Jbastidasdiaz@itba.edu.ar
+* France..
+
 * [Requirements](#requirements)
 * [Configuration](#configuration)
 * [Commands](#commands)
