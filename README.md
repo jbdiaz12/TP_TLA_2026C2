@@ -2,13 +2,13 @@
 
 [![✗](https://github.com/jbdiaz12/TP_TLA_2026C2/actions/workflows/pipeline.yaml/badge.svg?branch=production)](https://github.com/jbdiaz12/TP_TLA_2026C2/actions/workflows/pipeline.yaml)
 
-# Flex-Bison-Compiler
+# Stujfy
 
-A base compiler example, developed with Flex and Bison.
+A base compiler example, developed with Flex and Bison. 
 
 ## Authors
 * Jesus Gabriel Bastidas Diaz(L 64475)- Jbastidasdiaz@itba.edu.ar
-* France..
+* Francesco Vega Scarabino (L 65199) - fvegascarabino@itba.edu.ar
 
 * [Requirements](#requirements)
 * [Configuration](#configuration)
