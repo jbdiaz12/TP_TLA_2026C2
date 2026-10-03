@@ -245,7 +245,131 @@ Topic * TopicSemanticAction(char * name, char * goal, MemberList * members) {
 	return topic;
 }
 
+/** Scales. */
+
+LevelList * SingletonLevelListSemanticAction(char * level) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	LevelList * list = calloc(1, sizeof(LevelList));
+	list->level = level;
+	return list;
+}
+
+LevelList * LevelListSemanticAction(LevelList * list, char * level) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(LevelList, list, level, level);
+	return list;
+}
+
+Scale * ScaleSemanticAction(char * name, LevelList * levels) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Scale * scale = calloc(1, sizeof(Scale));
+	scale->name = name;
+	scale->levels = levels;
+	return scale;
+}
+
+/** Methods. */
+
+Parameter * ParameterSemanticAction(char * name, char * type) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Parameter * parameter = calloc(1, sizeof(Parameter));
+	parameter->name = name;
+	parameter->type = type;
+	return parameter;
+}
+
+ParameterList * SingletonParameterListSemanticAction(Parameter * parameter) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	ParameterList * list = calloc(1, sizeof(ParameterList));
+	list->parameter = parameter;
+	return list;
+}
+
+ParameterList * ParameterListSemanticAction(ParameterList * list, Parameter * parameter) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(ParameterList, list, parameter, parameter);
+	return list;
+}
+
+/**
+ * A session and a pause only differ in their type, so a single action builds
+ * both of them.
+ */
+Statement * DurationStatementSemanticAction(Expression * duration, StatementType type) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Statement * statement = calloc(1, sizeof(Statement));
+	statement->duration = duration;
+	statement->type = type;
+	return statement;
+}
+
+Statement * AfterStatementSemanticAction(Expression * delay, Statement * delayedStatement) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Statement * statement = calloc(1, sizeof(Statement));
+	statement->delay = delay;
+	statement->delayedStatement = delayedStatement;
+	statement->type = AFTER_STATEMENT;
+	return statement;
+}
+
+Statement * RepeatStatementSemanticAction(Expression * count, StatementList * body) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Statement * statement = calloc(1, sizeof(Statement));
+	statement->count = count;
+	statement->repeatBody = body;
+	statement->type = REPEAT_STATEMENT;
+	return statement;
+}
+
+Statement * ForStatementSemanticAction(char * variable, Expression * iterable, StatementList * body) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Statement * statement = calloc(1, sizeof(Statement));
+	statement->variable = variable;
+	statement->iterable = iterable;
+	statement->forBody = body;
+	statement->type = FOR_STATEMENT;
+	return statement;
+}
+
+StatementList * SingletonStatementListSemanticAction(Statement * statement) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	StatementList * list = calloc(1, sizeof(StatementList));
+	list->statement = statement;
+	return list;
+}
+
+StatementList * StatementListSemanticAction(StatementList * list, Statement * statement) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(StatementList, list, statement, statement);
+	return list;
+}
+
+Method * MethodSemanticAction(char * name, ParameterList * parameters, StatementList * body) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Method * method = calloc(1, sizeof(Method));
+	method->name = name;
+	method->parameters = parameters;
+	method->body = body;
+	return method;
+}
+
 /** Program. */
+
+Declaration * MethodDeclarationSemanticAction(Method * method) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Declaration * declaration = calloc(1, sizeof(Declaration));
+	declaration->method = method;
+	declaration->type = METHOD_DECLARATION;
+	return declaration;
+}
+
+Declaration * ScaleDeclarationSemanticAction(Scale * scale) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Declaration * declaration = calloc(1, sizeof(Declaration));
+	declaration->scale = scale;
+	declaration->type = SCALE_DECLARATION;
+	return declaration;
+}
 
 Declaration * GoalDeclarationSemanticAction(Goal * goal) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);

@@ -99,6 +99,13 @@ void yyerror(const YYLTYPE * location, const char * message) {}
 %destructor { destroyGoal($$); } <goal>
 %destructor { destroyMember($$); } <member>
 %destructor { destroyMemberList($$); } <memberList>
+%destructor { destroyMethod($$); } <method>
+%destructor { destroyLevelList($$); } <levelList>
+%destructor { destroyParameter($$); } <parameter>
+%destructor { destroyParameterList($$); } <parameterList>
+%destructor { destroyScale($$); } <scale>
+%destructor { destroyStatement($$); } <statement>
+%destructor { destroyStatementList($$); } <statementList>
 %destructor { destroyTopic($$); } <topic>
 
 /** Terminals: literals. */
@@ -169,6 +176,13 @@ void yyerror(const YYLTYPE * location, const char * message) {}
 %type <expressionList> expressionList
 %type <factor> factor
 %type <goal> goalDeclaration
+%type <levelList> levelList
+%type <method> methodDeclaration
+%type <parameter> parameter
+%type <parameterList> parameterList
+%type <scale> scaleDeclaration
+%type <statement> statement
+%type <statementList> statementList
 %type <member> member
 %type <memberList> memberList
 %type <program> program
@@ -202,6 +216,41 @@ declarationList: declaration															{ $$ = SingletonDeclarationListSemant
 
 declaration: goalDeclaration															{ $$ = GoalDeclarationSemanticAction($1); }
 	| topicDeclaration																	{ $$ = TopicDeclarationSemanticAction($1); }
+	| scaleDeclaration																	{ $$ = ScaleDeclarationSemanticAction($1); }
+	| methodDeclaration																	{ $$ = MethodDeclarationSemanticAction($1); }
+	;
+
+/** Scales. */
+
+scaleDeclaration: SCALE IDENTIFIER[name] OPEN_BRACE levelList[levels] CLOSE_BRACE		{ $$ = ScaleSemanticAction($name, $levels); }
+	;
+
+levelList: IDENTIFIER[level]															{ $$ = SingletonLevelListSemanticAction($level); }
+	| levelList[list] LESS IDENTIFIER[item]												{ $$ = LevelListSemanticAction($list, $item); }
+	;
+
+/** Methods. */
+
+methodDeclaration: METHOD IDENTIFIER[name] OPEN_PARENTHESIS CLOSE_PARENTHESIS OPEN_BRACE statementList[body] CLOSE_BRACE							{ $$ = MethodSemanticAction($name, NULL, $body); }
+	| METHOD IDENTIFIER[name] OPEN_PARENTHESIS parameterList[parameters] CLOSE_PARENTHESIS OPEN_BRACE statementList[body] CLOSE_BRACE				{ $$ = MethodSemanticAction($name, $parameters, $body); }
+	;
+
+parameterList: parameter																{ $$ = SingletonParameterListSemanticAction($1); }
+	| parameterList[list] COMMA parameter[item]											{ $$ = ParameterListSemanticAction($list, $item); }
+	;
+
+parameter: IDENTIFIER[name] COLON IDENTIFIER[type]										{ $$ = ParameterSemanticAction($name, $type); }
+	;
+
+statementList: statement																{ $$ = SingletonStatementListSemanticAction($1); }
+	| statementList[list] statement[item]												{ $$ = StatementListSemanticAction($list, $item); }
+	;
+
+statement: SESSION expression[duration] SEMICOLON										{ $$ = DurationStatementSemanticAction($duration, SESSION_STATEMENT); }
+	| PAUSE expression[duration] SEMICOLON												{ $$ = DurationStatementSemanticAction($duration, PAUSE_STATEMENT); }
+	| AFTER expression[delay] statement[delayed]										{ $$ = AfterStatementSemanticAction($delay, $delayed); }
+	| REPEAT expression[count] OPEN_BRACE statementList[body] CLOSE_BRACE				{ $$ = RepeatStatementSemanticAction($count, $body); }
+	| FOR IDENTIFIER[variable] IN expression[iterable] OPEN_BRACE statementList[body] CLOSE_BRACE	{ $$ = ForStatementSemanticAction($variable, $iterable, $body); }
 	;
 
 /** Goals and topics. */

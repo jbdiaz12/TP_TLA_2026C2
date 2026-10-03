@@ -56,9 +56,35 @@ MemberList * SingletonMemberListSemanticAction(Member * member);
 Goal * GoalSemanticAction(char * name, MemberList * members);
 Topic * TopicSemanticAction(char * name, char * goal, MemberList * members);
 
+/** Scales. */
+
+LevelList * LevelListSemanticAction(LevelList * list, char * level);
+LevelList * SingletonLevelListSemanticAction(char * level);
+
+Scale * ScaleSemanticAction(char * name, LevelList * levels);
+
+/** Methods. */
+
+Parameter * ParameterSemanticAction(char * name, char * type);
+
+ParameterList * ParameterListSemanticAction(ParameterList * list, Parameter * parameter);
+ParameterList * SingletonParameterListSemanticAction(Parameter * parameter);
+
+Statement * AfterStatementSemanticAction(Expression * delay, Statement * delayedStatement);
+Statement * DurationStatementSemanticAction(Expression * duration, StatementType type);
+Statement * ForStatementSemanticAction(char * variable, Expression * iterable, StatementList * body);
+Statement * RepeatStatementSemanticAction(Expression * count, StatementList * body);
+
+StatementList * SingletonStatementListSemanticAction(Statement * statement);
+StatementList * StatementListSemanticAction(StatementList * list, Statement * statement);
+
+Method * MethodSemanticAction(char * name, ParameterList * parameters, StatementList * body);
+
 /** Program. */
 
 Declaration * GoalDeclarationSemanticAction(Goal * goal);
+Declaration * MethodDeclarationSemanticAction(Method * method);
+Declaration * ScaleDeclarationSemanticAction(Scale * scale);
 Declaration * TopicDeclarationSemanticAction(Topic * topic);
 
 DeclarationList * DeclarationListSemanticAction(DeclarationList * list, Declaration * declaration);
