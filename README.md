@@ -3,12 +3,29 @@
 [![✗](https://github.com/jbdiaz12/TP_TLA_2026C2/actions/workflows/pipeline.yaml/badge.svg?branch=production)](https://github.com/jbdiaz12/TP_TLA_2026C2/actions/workflows/pipeline.yaml)
 
 # Stujfy
+Lenguaje de dominio específico para describir planes de aprendizaje y resolver
+automáticamente su distribución en el tiempo.
 
-A base compiler example, developed with Flex and Bison. 
+Se declaran los objetivos con su fecha límite, los temas que los componen, las
+dependencias de conocimiento entre ellos, el método de estudio aplicable a cada
+uno y la disponibilidad horaria real de quien estudia. A partir de esa
+descripción, el compilador construye el cronograma de sesiones. Un objetivo puede
+ser rendir un examen, alcanzar un nivel de idioma o dominar cualquier disciplina
+que admita ser dividida en temas.
 
-## Authors
-* Jesus Gabriel Bastidas Diaz(L 64475)- Jbastidasdiaz@itba.edu.ar
-* Francesco Vega Scarabino (L 65199) - fvegascarabino@itba.edu.ar
+
+La gramática formal `G = ⟨Σ, N, Π, S⟩` está documentada en
+[`doc/GRAMMAR.md`](doc/GRAMMAR.md).
+
+
+## Equipo
+| Nombres | Apellidos | Legajo | E-mail |
+| :------ | :-------- | :----- | :----- |
+| Jesús Gabriel | Díaz | 64475 | jbastidasdiaz@itba.edu.ar |
+| Francesco Vega | Scarabino | 65199 | fvegascarabino@itba.edu.ar |
+
+
+## Contenido
 
 * [Requirements](#requirements)
 * [Configuration](#configuration)
