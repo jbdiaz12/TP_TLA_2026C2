@@ -1,0 +1,5 @@
+rules {
+    when difficulty >= alto  -> espaciado(30m, [1d, 3d, 7d, 21d]);
+    when difficulty >= medio -> pomodoro(50m, 10m, 3);
+    otherwise                -> pomodoro(25m, 5m, 4);
+}

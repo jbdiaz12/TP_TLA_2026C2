@@ -1,0 +1,5 @@
+constraints {
+    topics(day) <= 2;
+    load(week) <= 20h;
+    finish(goal) <= deadline(goal) - 7d;
+}

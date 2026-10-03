@@ -1,0 +1,4 @@
+plan {
+    from: 2026-09-01;
+    strategy: earliestDeadlineFirst;
+}

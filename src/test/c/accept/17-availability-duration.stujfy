@@ -1,0 +1,4 @@
+availability {
+    sunday: 2h;
+    every:  1h 30m;
+}
