@@ -5,6 +5,7 @@
 static CompilerState * _compilerState = NULL;
 static Logger * _logger = NULL;
 
+
 /** Shutdown module's internal state. */
 void _shutdownBisonActionsModule() {
 	if (_logger != NULL) {
@@ -21,8 +22,6 @@ ModuleDestructor initializeBisonActionsModule(CompilerState * compilerState) {
 	return _shutdownBisonActionsModule;
 }
 
-/* IMPORTED FUNCTIONS */
-
 /* PRIVATE FUNCTIONS */
 
 static void _logSyntacticAnalyzerAction(const char * functionName);
@@ -34,16 +33,113 @@ static void _logSyntacticAnalyzerAction(const char * functionName) {
 	logDebugging(_logger, "%s", functionName);
 }
 
+/**
+ * Every list of this grammar is left-recursive, so the new item always belongs
+ * at the end of the list that is being built. The macro walks the list to find
+ * its last node and links the new one there, which keeps the order of the
+ * program and avoids writing the same loop once per type of list.
+ */
+#define APPEND(ListType, list, field, item)					\
+	do {													\
+		ListType * _node = calloc(1, sizeof(ListType));		\
+		_node->field = (item);								\
+		ListType * _last = (list);							\
+		while (_last->next != NULL) {						\
+			_last = _last->next;							\
+		}													\
+		_last->next = _node;								\
+	} while (0)
+
 /* PUBLIC FUNCTIONS */
+
+/** Constants. */
+
+Constant * DateConstantSemanticAction(const int value) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Constant * constant = calloc(1, sizeof(Constant));
+	constant->date = value;
+	constant->type = DATE_CONSTANT;
+	return constant;
+}
+
+Constant * DurationConstantSemanticAction(const int minutes) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Constant * constant = calloc(1, sizeof(Constant));
+	constant->duration = minutes;
+	constant->type = DURATION_CONSTANT;
+	return constant;
+}
 
 Constant * IntegerConstantSemanticAction(const int value) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Constant * constant = calloc(1, sizeof(Constant));
-	constant->value = value;
+	constant->integer = value;
+	constant->type = INTEGER_CONSTANT;
 	return constant;
 }
 
-Expression * ArithmeticExpressionSemanticAction(Expression * leftExpression, Expression * rightExpression, ExpressionType type) {
+Constant * StringConstantSemanticAction(char * value) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Constant * constant = calloc(1, sizeof(Constant));
+	constant->string = value;
+	constant->type = STRING_CONSTANT;
+	return constant;
+}
+
+Constant * TimeConstantSemanticAction(const int minutes) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Constant * constant = calloc(1, sizeof(Constant));
+	constant->time = minutes;
+	constant->type = TIME_CONSTANT;
+	return constant;
+}
+
+/** Factors. */
+
+Factor * ConstantFactorSemanticAction(Constant * constant) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Factor * factor = calloc(1, sizeof(Factor));
+	factor->constant = constant;
+	factor->type = CONSTANT_FACTOR;
+	return factor;
+}
+
+Factor * InvocationFactorSemanticAction(char * function, ExpressionList * arguments) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Factor * factor = calloc(1, sizeof(Factor));
+	factor->function = function;
+	factor->arguments = arguments;
+	factor->type = INVOCATION_FACTOR;
+	return factor;
+}
+
+Factor * ListFactorSemanticAction(ExpressionList * elements) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Factor * factor = calloc(1, sizeof(Factor));
+	factor->elements = elements;
+	factor->type = LIST_FACTOR;
+	return factor;
+}
+
+Factor * ParenthesizedFactorSemanticAction(Expression * expression) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Factor * factor = calloc(1, sizeof(Factor));
+	factor->expression = expression;
+	factor->type = PARENTHESIZED_FACTOR;
+	return factor;
+}
+
+Factor * VariableFactorSemanticAction(char * variable) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Factor * factor = calloc(1, sizeof(Factor));
+	factor->variable = variable;
+	factor->type = VARIABLE_FACTOR;
+	return factor;
+}
+
+/** Expressions. */
+
+Expression * BinaryExpressionSemanticAction(Expression * leftExpression, Expression * rightExpression, ExpressionType type) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Expression * expression = calloc(1, sizeof(Expression));
 	expression->leftExpression = leftExpression;
@@ -56,30 +152,134 @@ Expression * FactorExpressionSemanticAction(Factor * factor) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Expression * expression = calloc(1, sizeof(Expression));
 	expression->factor = factor;
-	expression->type = FACTOR;
+	expression->type = FACTOR_EXPRESSION;
 	return expression;
 }
 
-Factor * ConstantFactorSemanticAction(Constant * constant) {
+Expression * UnaryExpressionSemanticAction(Expression * operand, ExpressionType type) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
-	Factor * factor = calloc(1, sizeof(Factor));
-	factor->constant = constant;
-	factor->type = CONSTANT;
-	return factor;
+	Expression * expression = calloc(1, sizeof(Expression));
+	expression->operand = operand;
+	expression->type = type;
+	return expression;
 }
 
-Factor * ExpressionFactorSemanticAction(Expression * expression) {
+ExpressionList * SingletonExpressionListSemanticAction(Expression * expression) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
-	Factor * factor = calloc(1, sizeof(Factor));
-	factor->expression = expression;
-	factor->type = EXPRESSION;
-	return factor;
+	ExpressionList * list = calloc(1, sizeof(ExpressionList));
+	list->expression = expression;
+	return list;
 }
 
-Program * ExpressionProgramSemanticAction(Expression * expression) {
+ExpressionList * ExpressionListSemanticAction(ExpressionList * list, Expression * expression) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(ExpressionList, list, expression, expression);
+	return list;
+}
+
+/** Goals and topics. */
+
+Attribute * AttributeSemanticAction(char * name, ExpressionList * values) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Attribute * attribute = calloc(1, sizeof(Attribute));
+	attribute->name = name;
+	attribute->values = values;
+	return attribute;
+}
+
+/**
+ * The attribute "method" needs a production of its own because METHOD is a
+ * reserved word, so the lexical-analyzer never emits it as an IDENTIFIER. The
+ * name is written here instead of being carried by the token.
+ */
+Attribute * MethodAttributeSemanticAction(ExpressionList * values) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	char * name = calloc(7, sizeof(char));
+	strcpy(name, "method");
+	return AttributeSemanticAction(name, values);
+}
+
+Member * AttributeMemberSemanticAction(Attribute * attribute) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Member * member = calloc(1, sizeof(Member));
+	member->attribute = attribute;
+	member->type = ATTRIBUTE_MEMBER;
+	return member;
+}
+
+Member * TopicMemberSemanticAction(Topic * topic) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Member * member = calloc(1, sizeof(Member));
+	member->topic = topic;
+	member->type = TOPIC_MEMBER;
+	return member;
+}
+
+MemberList * SingletonMemberListSemanticAction(Member * member) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	MemberList * list = calloc(1, sizeof(MemberList));
+	list->member = member;
+	return list;
+}
+
+MemberList * MemberListSemanticAction(MemberList * list, Member * member) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(MemberList, list, member, member);
+	return list;
+}
+
+Goal * GoalSemanticAction(char * name, MemberList * members) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Goal * goal = calloc(1, sizeof(Goal));
+	goal->name = name;
+	goal->members = members;
+	return goal;
+}
+
+Topic * TopicSemanticAction(char * name, char * goal, MemberList * members) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Topic * topic = calloc(1, sizeof(Topic));
+	topic->name = name;
+	topic->goal = goal;
+	topic->members = members;
+	return topic;
+}
+
+/** Program. */
+
+Declaration * GoalDeclarationSemanticAction(Goal * goal) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Declaration * declaration = calloc(1, sizeof(Declaration));
+	declaration->goal = goal;
+	declaration->type = GOAL_DECLARATION;
+	return declaration;
+}
+
+Declaration * TopicDeclarationSemanticAction(Topic * topic) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Declaration * declaration = calloc(1, sizeof(Declaration));
+	declaration->topic = topic;
+	declaration->type = TOPIC_DECLARATION;
+	return declaration;
+}
+
+DeclarationList * SingletonDeclarationListSemanticAction(Declaration * declaration) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	DeclarationList * list = calloc(1, sizeof(DeclarationList));
+	list->declaration = declaration;
+	return list;
+}
+
+DeclarationList * DeclarationListSemanticAction(DeclarationList * list, Declaration * declaration) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(DeclarationList, list, declaration, declaration);
+	return list;
+}
+
+Program * ProgramSemanticAction(DeclarationList * declarations) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Program * program = calloc(1, sizeof(Program));
-	program->expression = expression;
+	program->declarations = declarations;
 	_compilerState->abstractSyntaxtTree = program;
 	return program;
 }
