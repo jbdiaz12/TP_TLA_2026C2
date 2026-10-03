@@ -1,0 +1,8 @@
+goal Frances {
+    topic Gramatica {
+        estimated: 20h;
+
+        topic Subjuntivo { estimated: 12h; }
+        topic Condicional { estimated: 8h; }
+    }
+}

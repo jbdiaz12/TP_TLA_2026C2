@@ -1,0 +1,6 @@
+// Un comentario de línea.
+goal TLA {
+    /* Un comentario
+       de bloque. */
+    due: 2026-12-05;    // Otro de línea.
+}

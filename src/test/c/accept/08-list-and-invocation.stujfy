@@ -1,0 +1,6 @@
+goal Listas {
+    intervals: [1d, 3d, 7d, 21d];
+    empty: [];
+    nullary: now();
+    arguments: between(09:00, 18:00);
+}

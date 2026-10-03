@@ -1,0 +1,8 @@
+goal Literales {
+    date: 2026-12-05;
+    time: 18:00;
+    duration: 2h30m;
+    week: 1w;
+    integer: 42;
+    string: "Teoría de lenguajes";
+}

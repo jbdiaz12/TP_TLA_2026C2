@@ -1,0 +1,6 @@
+// Rechazo semántico: "Inexistente" no está declarado en ningún lado.
+// El análisis sintáctico no puede detectarlo, porque la referencia es
+// sintácticamente válida.
+goal TLA {
+    topic Automatas { requires: Inexistente; }
+}

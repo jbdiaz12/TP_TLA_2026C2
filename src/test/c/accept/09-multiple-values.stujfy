@@ -1,0 +1,3 @@
+topic X in TLA {
+    requires: A, B, C;
+}

@@ -1,0 +1,6 @@
+goal Expresiones {
+    arithmetic: 2 * 3h + 30m;
+    parenthesized: (1 + 2) * 3;
+    comparison: load(day) <= 2h;
+    logical: topics(day) <= 2 and not load(week) > 20h;
+}

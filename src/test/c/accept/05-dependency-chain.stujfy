@@ -1,0 +1,5 @@
+goal TLA {
+    topic Automatas { estimated: 6h; }
+    topic Gramaticas { requires: Automatas; estimated: 8h; }
+    topic Parsing { requires: Gramaticas; estimated: 12h; }
+}
