@@ -1,0 +1,3 @@
+method simple() {
+    session 25m
+}

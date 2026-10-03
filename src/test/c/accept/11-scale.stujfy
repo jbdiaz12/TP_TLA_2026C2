@@ -1,0 +1,3 @@
+scale nivel {
+    muyBajo < bajo < medioBajo < medio < medioAlto < alto < muyAlto
+}

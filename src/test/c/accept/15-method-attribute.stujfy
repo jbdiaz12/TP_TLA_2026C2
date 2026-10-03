@@ -1,0 +1,6 @@
+goal TLA {
+    topic Automatas {
+        difficulty: medioAlto;
+        method: pomodoro(25m, 5m, 4);
+    }
+}

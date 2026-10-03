@@ -1,0 +1,6 @@
+method pomodoro(trabajo: duration, descanso: duration, ciclos: integer) {
+    repeat ciclos {
+        session trabajo;
+        pause descanso;
+    }
+}
