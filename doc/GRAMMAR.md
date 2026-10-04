@@ -67,3 +67,7 @@ S = program
 
 ---
 
+
+## ver de agregar N, Π y el readme si poner mas cosas 
+
+
