@@ -1,0 +1,63 @@
+scale nivel {
+    muyBajo < bajo < medioBajo < medio < medioAlto < alto < muyAlto
+}
+
+method pomodoro(trabajo: duration, descanso: duration, ciclos: integer) {
+    repeat ciclos {
+        session trabajo;
+        pause descanso;
+    }
+}
+
+method espaciado(unidad: duration, intervalos: list) {
+    session unidad;
+    for i in intervalos {
+        after i session unidad;
+    }
+}
+
+goal TLA {
+    due: 2026-12-05;
+    priority: alto;
+
+    topic Automatas {
+        difficulty: medioBajo;
+        estimated: 6h;
+    }
+
+    topic Gramaticas {
+        requires: Automatas;
+        difficulty: alto;
+        estimated: 4h30m;
+
+        topic LL1 { estimated: 3h; }
+        topic LR  { requires: LL1; estimated: 5h; }
+    }
+}
+
+topic Repaso in TLA {
+    requires: Gramaticas;
+    estimated: 2 * 90m;
+}
+
+availability {
+    weekdays: 18:00 .. 21:00;
+    saturday: 09:00 .. 12:00, 15:00 .. 19:00;
+    sunday:   2h;
+}
+
+constraints {
+    topics(day) <= 2;
+    load(week) <= 20h;
+    finish(goal) <= deadline(goal) - 7d;
+}
+
+rules {
+    when difficulty >= alto -> espaciado(30m, [1d, 3d, 7d, 21d]);
+    otherwise               -> pomodoro(25m, 5m, 4);
+}
+
+plan {
+    from: 2026-09-01;
+    strategy: earliestDeadlineFirst;
+}

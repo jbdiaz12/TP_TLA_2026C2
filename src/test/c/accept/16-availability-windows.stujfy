@@ -1,0 +1,4 @@
+availability {
+    weekdays: 18:00 .. 21:00;
+    saturday: 09:00 .. 12:00, 15:00 .. 19:00;
+}
