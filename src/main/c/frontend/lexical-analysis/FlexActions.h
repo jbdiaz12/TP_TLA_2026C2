@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/** Initialize module's internal state. */
+/** Initialize modul  internal state. */
 ModuleDestructor initializeFlexActionsModule();
 
 #endif
