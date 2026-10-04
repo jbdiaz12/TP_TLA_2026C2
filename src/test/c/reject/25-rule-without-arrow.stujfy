@@ -1,0 +1,1 @@
+rules { when difficulty >= alto pomodoro(25m, 5m, 4); }

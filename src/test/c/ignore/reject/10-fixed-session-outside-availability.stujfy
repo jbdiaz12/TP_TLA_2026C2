@@ -1,0 +1,5 @@
+// Rechazo semántico: la sesión fija cae fuera de la disponibilidad declarada.
+availability { weekdays: 18:00 .. 21:00; }
+topic Consulta in TLA {
+    fixed: 2026-11-20, 09:00, 1h;
+}

@@ -1,0 +1,4 @@
+// Rechazo semántico: el tiempo estimado resulta negativo.
+goal TLA {
+    topic Automatas { estimated: 1h - 2h; }
+}

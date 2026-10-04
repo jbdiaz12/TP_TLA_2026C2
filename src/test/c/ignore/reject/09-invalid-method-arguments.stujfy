@@ -1,0 +1,7 @@
+// Rechazo semántico: pomodoro espera 3 argumentos y recibe 1.
+method pomodoro(trabajo: duration, descanso: duration, ciclos: integer) {
+    repeat ciclos { session trabajo; pause descanso; }
+}
+goal TLA {
+    topic Automatas { method: pomodoro(25m); }
+}

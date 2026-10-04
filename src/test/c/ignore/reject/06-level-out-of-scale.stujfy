@@ -1,0 +1,5 @@
+// Rechazo semántico: "altisimo" no es un nivel de la escala.
+scale nivel { bajo < medio < alto }
+goal TLA {
+    topic Automatas { difficulty: altisimo; }
+}

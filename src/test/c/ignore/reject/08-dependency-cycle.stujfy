@@ -1,0 +1,6 @@
+// Rechazo semántico: el grafo de dependencias contiene un ciclo.
+goal TLA {
+    topic Automatas { requires: Parsing; }
+    topic Gramaticas { requires: Automatas; }
+    topic Parsing { requires: Gramaticas; }
+}

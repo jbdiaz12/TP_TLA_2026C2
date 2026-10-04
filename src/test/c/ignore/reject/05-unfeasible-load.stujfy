@@ -1,0 +1,7 @@
+// Rechazo semántico: 100h de estudio no entran en una semana de 1h diaria.
+goal TLA {
+    due: 2026-09-07;
+    topic Todo { estimated: 100h; }
+}
+availability { every: 1h; }
+plan { from: 2026-09-01; }
