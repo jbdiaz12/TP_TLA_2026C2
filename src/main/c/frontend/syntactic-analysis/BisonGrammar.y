@@ -221,7 +221,6 @@ void yyerror(const YYLTYPE * location, const char * message) {}
 
 %%
 
-// IMPORTANT: To use λ in the following grammar, use the %empty symbol.
 // This grammar has no nullable productions on purpose: every empty block is
 // written as an explicit production instead of an empty list.
 
