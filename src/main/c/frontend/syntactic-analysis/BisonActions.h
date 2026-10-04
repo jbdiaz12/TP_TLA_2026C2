@@ -34,6 +34,7 @@ Factor * InvocationFactorSemanticAction(char * function, ExpressionList * argume
 Factor * ListFactorSemanticAction(ExpressionList * elements);
 Factor * ParenthesizedFactorSemanticAction(Expression * expression);
 Factor * VariableFactorSemanticAction(char * variable);
+Factor * QuantifierFactorSemanticAction(const char * quantifier);
 
 Expression * BinaryExpressionSemanticAction(Expression * leftExpression, Expression * rightExpression, ExpressionType type);
 Expression * FactorExpressionSemanticAction(Factor * factor);
@@ -80,9 +81,46 @@ StatementList * StatementListSemanticAction(StatementList * list, Statement * st
 
 Method * MethodSemanticAction(char * name, ParameterList * parameters, StatementList * body);
 
+/** Availability. */
+
+Period * RangePeriodSemanticAction(Expression * from, Expression * to);
+Period * SinglePeriodSemanticAction(Expression * amount);
+
+PeriodList * PeriodListSemanticAction(PeriodList * list, Period * period);
+PeriodList * SingletonPeriodListSemanticAction(Period * period);
+
+Slot * SlotSemanticAction(char * day, PeriodList * periods);
+
+SlotList * SingletonSlotListSemanticAction(Slot * slot);
+SlotList * SlotListSemanticAction(SlotList * list, Slot * slot);
+
+Availability * AvailabilitySemanticAction(SlotList * slots);
+
+/** Constraints. */
+
+ConstraintList * ConstraintListSemanticAction(ConstraintList * list, Expression * constraint);
+ConstraintList * SingletonConstraintListSemanticAction(Expression * constraint);
+
+/** Rules. */
+
+Rule * OtherwiseRuleSemanticAction(Expression * action);
+Rule * WhenRuleSemanticAction(Expression * condition, Expression * action);
+
+RuleList * RuleListSemanticAction(RuleList * list, Rule * rule);
+RuleList * SingletonRuleListSemanticAction(Rule * rule);
+
+/** Plan. */
+
+AttributeList * AttributeListSemanticAction(AttributeList * list, Attribute * attribute);
+AttributeList * SingletonAttributeListSemanticAction(Attribute * attribute);
+
 /** Program. */
 
+Declaration * AvailabilityDeclarationSemanticAction(Availability * availability);
+Declaration * ConstraintsDeclarationSemanticAction(ConstraintList * constraints);
 Declaration * GoalDeclarationSemanticAction(Goal * goal);
+Declaration * PlanDeclarationSemanticAction(AttributeList * attributes);
+Declaration * RulesDeclarationSemanticAction(RuleList * rules);
 Declaration * MethodDeclarationSemanticAction(Method * method);
 Declaration * ScaleDeclarationSemanticAction(Scale * scale);
 Declaration * TopicDeclarationSemanticAction(Topic * topic);

@@ -106,6 +106,15 @@ void yyerror(const YYLTYPE * location, const char * message) {}
 %destructor { destroyScale($$); } <scale>
 %destructor { destroyStatement($$); } <statement>
 %destructor { destroyStatementList($$); } <statementList>
+%destructor { destroyAttributeList($$); } <attributeList>
+%destructor { destroyAvailability($$); } <availability>
+%destructor { destroyConstraintList($$); } <constraintList>
+%destructor { destroyPeriod($$); } <period>
+%destructor { destroyPeriodList($$); } <periodList>
+%destructor { destroyRule($$); } <rule>
+%destructor { destroyRuleList($$); } <ruleList>
+%destructor { destroySlot($$); } <slot>
+%destructor { destroySlotList($$); } <slotList>
 %destructor { destroyTopic($$); } <topic>
 
 /** Terminals: literals. */
@@ -183,6 +192,15 @@ void yyerror(const YYLTYPE * location, const char * message) {}
 %type <scale> scaleDeclaration
 %type <statement> statement
 %type <statementList> statementList
+%type <attributeList> attributeList planDeclaration
+%type <availability> availabilityDeclaration
+%type <constraintList> constraintList constraintsDeclaration
+%type <period> period
+%type <periodList> periodList
+%type <rule> rule
+%type <ruleList> ruleList rulesDeclaration
+%type <slot> slot
+%type <slotList> slotList
 %type <member> member
 %type <memberList> memberList
 %type <program> program
@@ -218,6 +236,62 @@ declaration: goalDeclaration															{ $$ = GoalDeclarationSemanticAction(
 	| topicDeclaration																	{ $$ = TopicDeclarationSemanticAction($1); }
 	| scaleDeclaration																	{ $$ = ScaleDeclarationSemanticAction($1); }
 	| methodDeclaration																	{ $$ = MethodDeclarationSemanticAction($1); }
+	| availabilityDeclaration															{ $$ = AvailabilityDeclarationSemanticAction($1); }
+	| constraintsDeclaration															{ $$ = ConstraintsDeclarationSemanticAction($1); }
+	| rulesDeclaration																	{ $$ = RulesDeclarationSemanticAction($1); }
+	| planDeclaration																	{ $$ = PlanDeclarationSemanticAction($1); }
+	;
+
+/** Availability. */
+
+availabilityDeclaration: AVAILABILITY OPEN_BRACE slotList[slots] CLOSE_BRACE				{ $$ = AvailabilitySemanticAction($slots); }
+	;
+
+slotList: slot																			{ $$ = SingletonSlotListSemanticAction($1); }
+	| slotList[list] slot[item]															{ $$ = SlotListSemanticAction($list, $item); }
+	;
+
+slot: IDENTIFIER[day] COLON periodList[periods] SEMICOLON								{ $$ = SlotSemanticAction($day, $periods); }
+	;
+
+periodList: period																		{ $$ = SingletonPeriodListSemanticAction($1); }
+	| periodList[list] COMMA period[item]												{ $$ = PeriodListSemanticAction($list, $item); }
+	;
+
+period: expression[amount]																{ $$ = SinglePeriodSemanticAction($amount); }
+	| expression[from] RANGE expression[to]												{ $$ = RangePeriodSemanticAction($from, $to); }
+	;
+
+/** Constraints. */
+
+constraintsDeclaration: CONSTRAINTS OPEN_BRACE constraintList[constraints] CLOSE_BRACE	{ $$ = $constraints; }
+	;
+
+constraintList: expression[constraint] SEMICOLON										{ $$ = SingletonConstraintListSemanticAction($constraint); }
+	| constraintList[list] expression[item] SEMICOLON									{ $$ = ConstraintListSemanticAction($list, $item); }
+	;
+
+/** Rules. */
+
+rulesDeclaration: RULES OPEN_BRACE ruleList[rules] CLOSE_BRACE							{ $$ = $rules; }
+	;
+
+ruleList: rule																			{ $$ = SingletonRuleListSemanticAction($1); }
+	| ruleList[list] rule[item]															{ $$ = RuleListSemanticAction($list, $item); }
+	;
+
+rule: WHEN expression[condition] ARROW expression[action] SEMICOLON						{ $$ = WhenRuleSemanticAction($condition, $action); }
+	| OTHERWISE ARROW expression[action] SEMICOLON										{ $$ = OtherwiseRuleSemanticAction($action); }
+	;
+
+/** Plan. */
+
+planDeclaration: PLAN OPEN_BRACE attributeList[attributes] CLOSE_BRACE					{ $$ = $attributes; }
+	| PLAN OPEN_BRACE CLOSE_BRACE														{ $$ = NULL; }
+	;
+
+attributeList: attribute																{ $$ = SingletonAttributeListSemanticAction($1); }
+	| attributeList[list] attribute[item]												{ $$ = AttributeListSemanticAction($list, $item); }
 	;
 
 /** Scales. */
@@ -301,6 +375,8 @@ factor: OPEN_PARENTHESIS expression CLOSE_PARENTHESIS									{ $$ = Parenthesiz
 	| IDENTIFIER[function] OPEN_PARENTHESIS expressionList[arguments] CLOSE_PARENTHESIS	{ $$ = InvocationFactorSemanticAction($function, $arguments); }
 	| IDENTIFIER[function] OPEN_PARENTHESIS CLOSE_PARENTHESIS							{ $$ = InvocationFactorSemanticAction($function, NULL); }
 	| IDENTIFIER[variable]																{ $$ = VariableFactorSemanticAction($variable); }
+	| GOAL																				{ $$ = QuantifierFactorSemanticAction("goal"); }
+	| TOPIC																				{ $$ = QuantifierFactorSemanticAction("topic"); }
 	| constant																			{ $$ = ConstantFactorSemanticAction($1); }
 	;
 

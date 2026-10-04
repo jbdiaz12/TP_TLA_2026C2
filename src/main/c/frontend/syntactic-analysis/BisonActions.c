@@ -137,6 +137,19 @@ Factor * VariableFactorSemanticAction(char * variable) {
 	return factor;
 }
 
+/**
+ * The implicit quantifiers of a constraint ("goal" and "topic") are reserved
+ * words, so the lexical-analyzer never emits them as an IDENTIFIER. They
+ * behave as a variable anywhere inside an expression, and this action copies
+ * their name so that the node owns its own memory, like every other variable.
+ */
+Factor * QuantifierFactorSemanticAction(const char * quantifier) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	char * name = calloc(1 + strlen(quantifier), sizeof(char));
+	strcpy(name, quantifier);
+	return VariableFactorSemanticAction(name);
+}
+
 /** Expressions. */
 
 Expression * BinaryExpressionSemanticAction(Expression * leftExpression, Expression * rightExpression, ExpressionType type) {
@@ -353,7 +366,169 @@ Method * MethodSemanticAction(char * name, ParameterList * parameters, Statement
 	return method;
 }
 
+/** Availability. */
+
+Period * SinglePeriodSemanticAction(Expression * amount) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Period * period = calloc(1, sizeof(Period));
+	period->amount = amount;
+	period->type = SINGLE_PERIOD;
+	return period;
+}
+
+Period * RangePeriodSemanticAction(Expression * from, Expression * to) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Period * period = calloc(1, sizeof(Period));
+	period->from = from;
+	period->to = to;
+	period->type = RANGE_PERIOD;
+	return period;
+}
+
+PeriodList * SingletonPeriodListSemanticAction(Period * period) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	PeriodList * list = calloc(1, sizeof(PeriodList));
+	list->period = period;
+	return list;
+}
+
+PeriodList * PeriodListSemanticAction(PeriodList * list, Period * period) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(PeriodList, list, period, period);
+	return list;
+}
+
+Slot * SlotSemanticAction(char * day, PeriodList * periods) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Slot * slot = calloc(1, sizeof(Slot));
+	slot->day = day;
+	slot->periods = periods;
+	return slot;
+}
+
+SlotList * SingletonSlotListSemanticAction(Slot * slot) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	SlotList * list = calloc(1, sizeof(SlotList));
+	list->slot = slot;
+	return list;
+}
+
+SlotList * SlotListSemanticAction(SlotList * list, Slot * slot) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(SlotList, list, slot, slot);
+	return list;
+}
+
+Availability * AvailabilitySemanticAction(SlotList * slots) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Availability * availability = calloc(1, sizeof(Availability));
+	availability->slots = slots;
+	return availability;
+}
+
+/** Constraints. */
+
+ConstraintList * SingletonConstraintListSemanticAction(Expression * constraint) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	ConstraintList * list = calloc(1, sizeof(ConstraintList));
+	list->constraint = constraint;
+	return list;
+}
+
+ConstraintList * ConstraintListSemanticAction(ConstraintList * list, Expression * constraint) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(ConstraintList, list, constraint, constraint);
+	return list;
+}
+
+/** Rules. */
+
+Rule * WhenRuleSemanticAction(Expression * condition, Expression * action) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Rule * rule = calloc(1, sizeof(Rule));
+	rule->condition = condition;
+	rule->action = action;
+	rule->type = WHEN_RULE;
+	return rule;
+}
+
+/**
+ * The default rule carries no condition, so its field stays NULL: the
+ * destructor of an expression already tolerates it.
+ */
+Rule * OtherwiseRuleSemanticAction(Expression * action) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Rule * rule = calloc(1, sizeof(Rule));
+	rule->condition = NULL;
+	rule->action = action;
+	rule->type = OTHERWISE_RULE;
+	return rule;
+}
+
+RuleList * SingletonRuleListSemanticAction(Rule * rule) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	RuleList * list = calloc(1, sizeof(RuleList));
+	list->rule = rule;
+	return list;
+}
+
+RuleList * RuleListSemanticAction(RuleList * list, Rule * rule) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(RuleList, list, rule, rule);
+	return list;
+}
+
+/** Plan. */
+
+AttributeList * SingletonAttributeListSemanticAction(Attribute * attribute) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	AttributeList * list = calloc(1, sizeof(AttributeList));
+	list->attribute = attribute;
+	return list;
+}
+
+AttributeList * AttributeListSemanticAction(AttributeList * list, Attribute * attribute) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	APPEND(AttributeList, list, attribute, attribute);
+	return list;
+}
+
 /** Program. */
+
+Declaration * AvailabilityDeclarationSemanticAction(Availability * availability) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Declaration * declaration = calloc(1, sizeof(Declaration));
+	declaration->availability = availability;
+	declaration->type = AVAILABILITY_DECLARATION;
+	return declaration;
+}
+
+Declaration * ConstraintsDeclarationSemanticAction(ConstraintList * constraints) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Declaration * declaration = calloc(1, sizeof(Declaration));
+	declaration->constraints = constraints;
+	declaration->type = CONSTRAINTS_DECLARATION;
+	return declaration;
+}
+
+/**
+ * The attributes are NULL when the block of the plan is empty.
+ */
+Declaration * PlanDeclarationSemanticAction(AttributeList * attributes) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Declaration * declaration = calloc(1, sizeof(Declaration));
+	declaration->plan = attributes;
+	declaration->type = PLAN_DECLARATION;
+	return declaration;
+}
+
+Declaration * RulesDeclarationSemanticAction(RuleList * rules) {
+	_logSyntacticAnalyzerAction(__FUNCTION__);
+	Declaration * declaration = calloc(1, sizeof(Declaration));
+	declaration->rules = rules;
+	declaration->type = RULES_DECLARATION;
+	return declaration;
+}
 
 Declaration * MethodDeclarationSemanticAction(Method * method) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
