@@ -1,0 +1,5 @@
+// El domingo no se declara: un día sin declarar no está disponible para estudiar.
+availability {
+    weekdays: 3h;
+    saturday: 5h;
+}

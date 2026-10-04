@@ -49,8 +49,9 @@ goal TLA {
 }
 
 availability {
+    // Los días que no se declaran (aquí, el domingo) no están disponibles para estudiar.
     weekdays: 18:00 .. 21:00;
-    sunday:   rest;
+    saturday: 09:00 .. 12:00;
 }
 
 rules {
@@ -59,8 +60,8 @@ rules {
 }
 
 plan {
-    from:   2026-09-01;
-    export: calendar, summary;
+    from:     2026-09-01;
+    strategy: earliestDeadlineFirst;
 }
 ```
 
@@ -97,7 +98,7 @@ corresponden con los siguientes programas:
 | (VII) | `12-method-repeat`, `15-method-attribute` | `ignore/reject/02-type-mismatch` |
 | (VIII) | `13-method-for`, `19-rules` | `ignore/reject/08-dependency-cycle` |
 | (IX) | `26-reused-method` | `ignore/reject/09-invalid-method-arguments` |
-| (X) | `27-availability-rest-day` | `ignore/reject/10-fixed-session-outside-availability` |
+| (X) | `27-availability-free-day` | `ignore/reject/10-fixed-session-outside-availability` |
 
 La sección 5 de [`doc/GRAMMAR.md`](doc/GRAMMAR.md#5-correspondencia-con-la-etapa-1)
 detalla cómo cambió la sintaxis respecto de los ejemplos del informe.

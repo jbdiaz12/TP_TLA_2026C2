@@ -1,4 +1,0 @@
-availability {
-    weekdays: 3h;
-    sunday: rest;
-}

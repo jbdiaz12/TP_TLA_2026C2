@@ -277,10 +277,10 @@ bloques). Las construcciones del informe se expresan así:
 | `method pomodoro { work 25m; … }` | `method pomodoro(…) { … }` y `method: pomodoro(25m, 5m, 4);` | `12-method-repeat`, `15-method-attribute` |
 | `profile` + `use` | Un `method` declarado una vez y aplicado a varios temas | `26-reused-method` |
 | `if (…) { … } else { … }` | Bloque `rules` con `when … -> …;` y `otherwise -> …;` | `19-rules` |
-| `mon, wed, fri = 3h;` `sun = rest;` | `weekdays: 3h;` `sunday: rest;` | `16`, `17`, `27-availability-rest-day` |
+| `mon, wed, fri = 3h;` `sun = rest;` | `weekdays: 3h;` (un día sin declarar no está disponible para estudiar, sin `rest`) | `16`, `17`, `27-availability-free-day` |
 | Sesión fija en fecha y hora | `fixed: 2026-11-20, 18:00, 90m;` | `28-fixed-session` |
 | `constraint noMoreThan 2 topicsPer d;` | `constraints { topics(day) <= 2; }` | `18-constraints` |
-| `plan from … until deadlines { export … }` | `plan { from: …; until: deadlines; export: calendar, summary; }` | `29-plan-export` |
+| `plan from … until deadlines { export … }` | `plan { from: …; until: deadlines; }` (siempre se generan el HTML y el iCalendar, sin `export`) | `29-plan-range` |
 
 Los porcentajes y booleanos del informe no tienen literal propio: la prioridad
 se expresa como nivel de una escala y las condiciones como expresiones lógicas.
