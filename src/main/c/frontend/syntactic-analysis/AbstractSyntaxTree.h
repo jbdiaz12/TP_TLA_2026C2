@@ -173,6 +173,7 @@ struct Factor {
 		};
 	};
 	FactorType type;
+	Position position;
 };
 
 struct Expression {
@@ -270,6 +271,7 @@ struct Method {
 struct Attribute {
 	char * name;
 	ExpressionList * values;
+	Position position;
 };
 
 struct Member {
@@ -294,8 +296,10 @@ struct Goal {
 
 struct Topic {
 	char * name;
-	/** The goal this topic belongs to, or NULL when it's a nested topic. */
+	/** The goal of a topic declared with "in", or NULL otherwise. */
 	char * goal;
+	/** Where the name of that goal is written. */
+	Position goalPosition;
 	/** NULL when the block is empty. */
 	MemberList * members;
 	Position position;

@@ -1,0 +1,2 @@
+goal TLA { topic A { } }
+topic B in A { }

@@ -29,12 +29,12 @@ Constant * IntegerConstantSemanticAction(const int value);
 Constant * StringConstantSemanticAction(char * value);
 Constant * TimeConstantSemanticAction(const int minutes);
 
-Factor * ConstantFactorSemanticAction(Constant * constant);
-Factor * InvocationFactorSemanticAction(char * function, ExpressionList * arguments);
-Factor * ListFactorSemanticAction(ExpressionList * elements);
-Factor * ParenthesizedFactorSemanticAction(Expression * expression);
-Factor * VariableFactorSemanticAction(char * variable);
-Factor * QuantifierFactorSemanticAction(const char * quantifier);
+Factor * ConstantFactorSemanticAction(Constant * constant, Position position);
+Factor * InvocationFactorSemanticAction(char * function, ExpressionList * arguments, Position position);
+Factor * ListFactorSemanticAction(ExpressionList * elements, Position position);
+Factor * ParenthesizedFactorSemanticAction(Expression * expression, Position position);
+Factor * VariableFactorSemanticAction(char * variable, Position position);
+Factor * QuantifierFactorSemanticAction(const char * quantifier, Position position);
 
 Expression * BinaryExpressionSemanticAction(Expression * leftExpression, Expression * rightExpression, ExpressionType type);
 Expression * FactorExpressionSemanticAction(Factor * factor);
@@ -45,8 +45,8 @@ ExpressionList * SingletonExpressionListSemanticAction(Expression * expression);
 
 /** Goals and topics. */
 
-Attribute * AttributeSemanticAction(char * name, ExpressionList * values);
-Attribute * MethodAttributeSemanticAction(ExpressionList * values);
+Attribute * AttributeSemanticAction(char * name, ExpressionList * values, Position position);
+Attribute * MethodAttributeSemanticAction(ExpressionList * values, Position position);
 
 Member * AttributeMemberSemanticAction(Attribute * attribute);
 Member * TopicMemberSemanticAction(Topic * topic);
@@ -55,7 +55,7 @@ MemberList * MemberListSemanticAction(MemberList * list, Member * member);
 MemberList * SingletonMemberListSemanticAction(Member * member);
 
 Goal * GoalSemanticAction(char * name, MemberList * members, Position position);
-Topic * TopicSemanticAction(char * name, char * goal, MemberList * members, Position position);
+Topic * TopicSemanticAction(char * name, char * goal, MemberList * members, Position position, Position goalPosition);
 
 /** Scales. */
 

@@ -1,3 +1,4 @@
+goal TLA { topic Gramaticas { } }
 topic Repaso in TLA {
     requires: Gramaticas;
     estimated: 2h;

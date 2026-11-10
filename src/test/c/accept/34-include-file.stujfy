@@ -1,2 +1,2 @@
 include "src/test/c/lib/propios.stujfy"
-topic Automatas { method: Repaso(); }
+goal TLA { topic Automatas { method: Repaso(); } }

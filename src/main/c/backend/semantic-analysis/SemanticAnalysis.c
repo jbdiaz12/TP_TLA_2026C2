@@ -30,11 +30,119 @@ static void _declareSymbols(SymbolTable * table, const DeclarationList * declara
 static void _declareTopic(SymbolTable * table, const Topic * topic, Symbol * goal);
 static const char * _describe(const Position position);
 static const Method * _findPreviousMethod(const DeclarationList * declarations, const Method * method);
+static Symbol * _findTopicSymbol(const SymbolTable * table, const Topic * topic);
 static void _reportSemanticError(const Position position, const char * const format, ...);
+static void _resolveGoals(SymbolTable * table, const DeclarationList * declarations);
+static void _setGoal(const SymbolTable * table, const Topic * topic, Symbol * goal);
+static void _validateNestedTopics(const MemberList * members);
+static void _validateRequirements(const SymbolTable * table);
 static void _validateUniqueBlock(const Declaration ** first, const Declaration * declaration, const char * keyword);
 static void _validateMethod(const DeclarationList * declarations, const Method * method);
 static void _validateMethodName(const DeclarationList * declarations, const Method * method);
 static void _validateParameters(const Method * method);
+
+/**
+ * Every topic belongs to a goal, because the deadline of its goal is what
+ * schedules it. A topic declared outside of the goals names its goal with
+ * "in", and once it's resolved, the topic and the topics nested inside it
+ * belong to that goal.
+ */
+static void _resolveGoals(SymbolTable * table, const DeclarationList * declarations) {
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		const Declaration * declaration = node->declaration;
+		if (declaration->type == GOAL_DECLARATION) {
+			_validateNestedTopics(declaration->goal->members);
+		}
+		else if (declaration->type == TOPIC_DECLARATION) {
+			const Topic * topic = declaration->topic;
+			if (topic->goal == NULL) {
+				_reportSemanticError(topic->position,
+					"el tema '%s' no pertenece a ningún objetivo: se declara dentro de un 'goal', o como 'topic %s in Objetivo'.",
+					topic->name, topic->name);
+			}
+			else {
+				Symbol * goal = findSymbol(table, GOAL_SYMBOL, topic->goal);
+				if (goal == NULL) {
+					_reportSemanticError(topic->goalPosition, "el objetivo '%s' no está declarado.", topic->goal);
+				}
+				else if (goal->kind != GOAL_SYMBOL) {
+					_reportSemanticError(topic->goalPosition,
+						"'%s' es un tema, pero 'in' lleva el objetivo al que pertenece el tema.", topic->goal);
+				}
+				else {
+					_setGoal(table, topic, goal);
+				}
+			}
+			_validateNestedTopics(topic->members);
+		}
+	}
+}
+
+/**
+ * Sets the goal of a topic and of every topic nested inside it.
+ */
+static void _setGoal(const SymbolTable * table, const Topic * topic, Symbol * goal) {
+	Symbol * symbol = _findTopicSymbol(table, topic);
+	if (symbol != NULL) {
+		symbol->owner = goal;
+	}
+	for (const MemberList * node = topic->members; node != NULL; node = node->next) {
+		if (node->member->type == TOPIC_MEMBER) {
+			_setGoal(table, node->member->topic, goal);
+		}
+	}
+}
+
+/**
+ * A nested topic already belongs to the goal of the topic (or goal) that
+ * contains it, so it can't name another one with "in".
+ */
+static void _validateNestedTopics(const MemberList * members) {
+	for (const MemberList * node = members; node != NULL; node = node->next) {
+		if (node->member->type == TOPIC_MEMBER) {
+			const Topic * topic = node->member->topic;
+			if (topic->goal != NULL) {
+				_reportSemanticError(topic->goalPosition,
+					"el tema '%s' está dentro de otro bloque, así que ya pertenece a su objetivo y no lleva 'in'.",
+					topic->name);
+			}
+			_validateNestedTopics(topic->members);
+		}
+	}
+}
+
+/**
+ * The values of "requires" are the names of declared topics. A topic can
+ * require a topic of another goal, but not a goal itself.
+ */
+static void _validateRequirements(const SymbolTable * table) {
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind != TOPIC_SYMBOL) {
+			continue;
+		}
+		for (const MemberList * node = symbol->topic->members; node != NULL; node = node->next) {
+			if (node->member->type != ATTRIBUTE_MEMBER || strcmp(node->member->attribute->name, "requires") != 0) {
+				continue;
+			}
+			const Attribute * attribute = node->member->attribute;
+			for (const ExpressionList * value = attribute->values; value != NULL; value = value->next) {
+				const Expression * expression = value->expression;
+				if (expression->type != FACTOR_EXPRESSION || expression->factor->type != VARIABLE_FACTOR) {
+					_reportSemanticError(attribute->position, "'requires' lleva nombres de temas, separados por comas.");
+					break;
+				}
+				const Factor * factor = expression->factor;
+				const Symbol * required = findSymbol(table, TOPIC_SYMBOL, factor->variable);
+				if (required == NULL) {
+					_reportSemanticError(factor->position, "el tema '%s' no está declarado.", factor->variable);
+				}
+				else if (required->kind == GOAL_SYMBOL) {
+					_reportSemanticError(factor->position, "'%s' es un objetivo, pero 'requires' lleva temas.", factor->variable);
+				}
+			}
+		}
+	}
+}
 
 /**
  * Declares a goal, a topic or a scale, and reports it if its name is already
@@ -184,6 +292,19 @@ static const Method * _findPreviousMethod(const DeclarationList * declarations, 
 }
 
 /**
+ * Finds the symbol of a topic. Two topics can share their name (which is an
+ * error, already reported), so the topic is found by its node instead.
+ */
+static Symbol * _findTopicSymbol(const SymbolTable * table, const Topic * topic) {
+	for (Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind == TOPIC_SYMBOL && symbol->topic == topic) {
+			return symbol;
+		}
+	}
+	return NULL;
+}
+
+/**
  * Reports a semantic error to the user, in the standard error output and with
  * the file (only when it isn't the main program) and the position of the
  * symbol that causes it.
@@ -298,6 +419,8 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_errors = 0;
 	SymbolTable * table = createSymbolTable();
 	_declareSymbols(table, program->declarations);
+	_resolveGoals(table, program->declarations);
+	_validateRequirements(table);
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(program->declarations, node->declaration->method);

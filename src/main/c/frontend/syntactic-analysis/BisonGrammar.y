@@ -384,10 +384,10 @@ goalDeclaration: GOAL IDENTIFIER[name] OPEN_BRACE memberList[members] CLOSE_BRAC
 	| GOAL IDENTIFIER[name] OPEN_BRACE CLOSE_BRACE										{ $$ = GoalSemanticAction($name, NULL, POSITION(@name)); }
 	;
 
-topicDeclaration: TOPIC IDENTIFIER[name] OPEN_BRACE memberList[members] CLOSE_BRACE		{ $$ = TopicSemanticAction($name, NULL, $members, POSITION(@name)); }
-	| TOPIC IDENTIFIER[name] OPEN_BRACE CLOSE_BRACE										{ $$ = TopicSemanticAction($name, NULL, NULL, POSITION(@name)); }
-	| TOPIC IDENTIFIER[name] IN IDENTIFIER[goal] OPEN_BRACE memberList[members] CLOSE_BRACE	{ $$ = TopicSemanticAction($name, $goal, $members, POSITION(@name)); }
-	| TOPIC IDENTIFIER[name] IN IDENTIFIER[goal] OPEN_BRACE CLOSE_BRACE					{ $$ = TopicSemanticAction($name, $goal, NULL, POSITION(@name)); }
+topicDeclaration: TOPIC IDENTIFIER[name] OPEN_BRACE memberList[members] CLOSE_BRACE		{ $$ = TopicSemanticAction($name, NULL, $members, POSITION(@name), POSITION(@name)); }
+	| TOPIC IDENTIFIER[name] OPEN_BRACE CLOSE_BRACE										{ $$ = TopicSemanticAction($name, NULL, NULL, POSITION(@name), POSITION(@name)); }
+	| TOPIC IDENTIFIER[name] IN IDENTIFIER[goal] OPEN_BRACE memberList[members] CLOSE_BRACE	{ $$ = TopicSemanticAction($name, $goal, $members, POSITION(@name), POSITION(@goal)); }
+	| TOPIC IDENTIFIER[name] IN IDENTIFIER[goal] OPEN_BRACE CLOSE_BRACE					{ $$ = TopicSemanticAction($name, $goal, NULL, POSITION(@name), POSITION(@goal)); }
 	;
 
 memberList: member																		{ $$ = SingletonMemberListSemanticAction($1); }
@@ -398,8 +398,8 @@ member: attribute																		{ $$ = AttributeMemberSemanticAction($1); }
 	| topicDeclaration																	{ $$ = TopicMemberSemanticAction($1); }
 	;
 
-attribute: IDENTIFIER[name] COLON expressionList[values] SEMICOLON						{ $$ = AttributeSemanticAction($name, $values); }
-	| METHOD COLON expressionList[values] SEMICOLON										{ $$ = MethodAttributeSemanticAction($values); }
+attribute: IDENTIFIER[name] COLON expressionList[values] SEMICOLON						{ $$ = AttributeSemanticAction($name, $values, POSITION(@name)); }
+	| METHOD COLON expressionList[values] SEMICOLON										{ $$ = MethodAttributeSemanticAction($values, POSITION(@1)); }
 	;
 
 /** Expressions. */
@@ -420,15 +420,15 @@ expression: expression[left] OR expression[right]										{ $$ = BinaryExpressi
 	| factor																			{ $$ = FactorExpressionSemanticAction($1); }
 	;
 
-factor: OPEN_PARENTHESIS expression CLOSE_PARENTHESIS									{ $$ = ParenthesizedFactorSemanticAction($2); }
-	| OPEN_BRACKET expressionList[elements] CLOSE_BRACKET								{ $$ = ListFactorSemanticAction($elements); }
-	| OPEN_BRACKET CLOSE_BRACKET														{ $$ = ListFactorSemanticAction(NULL); }
-	| IDENTIFIER[function] OPEN_PARENTHESIS expressionList[arguments] CLOSE_PARENTHESIS	{ $$ = InvocationFactorSemanticAction($function, $arguments); }
-	| IDENTIFIER[function] OPEN_PARENTHESIS CLOSE_PARENTHESIS							{ $$ = InvocationFactorSemanticAction($function, NULL); }
-	| IDENTIFIER[variable]																{ $$ = VariableFactorSemanticAction($variable); }
-	| GOAL																				{ $$ = QuantifierFactorSemanticAction("goal"); }
-	| TOPIC																				{ $$ = QuantifierFactorSemanticAction("topic"); }
-	| constant																			{ $$ = ConstantFactorSemanticAction($1); }
+factor: OPEN_PARENTHESIS expression CLOSE_PARENTHESIS									{ $$ = ParenthesizedFactorSemanticAction($2, POSITION(@$)); }
+	| OPEN_BRACKET expressionList[elements] CLOSE_BRACKET								{ $$ = ListFactorSemanticAction($elements, POSITION(@$)); }
+	| OPEN_BRACKET CLOSE_BRACKET														{ $$ = ListFactorSemanticAction(NULL, POSITION(@$)); }
+	| IDENTIFIER[function] OPEN_PARENTHESIS expressionList[arguments] CLOSE_PARENTHESIS	{ $$ = InvocationFactorSemanticAction($function, $arguments, POSITION(@$)); }
+	| IDENTIFIER[function] OPEN_PARENTHESIS CLOSE_PARENTHESIS							{ $$ = InvocationFactorSemanticAction($function, NULL, POSITION(@$)); }
+	| IDENTIFIER[variable]																{ $$ = VariableFactorSemanticAction($variable, POSITION(@$)); }
+	| GOAL																				{ $$ = QuantifierFactorSemanticAction("goal", POSITION(@$)); }
+	| TOPIC																				{ $$ = QuantifierFactorSemanticAction("topic", POSITION(@$)); }
+	| constant																			{ $$ = ConstantFactorSemanticAction($1, POSITION(@$)); }
 	;
 
 constant: INTEGER																		{ $$ = IntegerConstantSemanticAction($1); }

@@ -96,44 +96,49 @@ Constant * TimeConstantSemanticAction(const int minutes) {
 
 /** Factors. */
 
-Factor * ConstantFactorSemanticAction(Constant * constant) {
+Factor * ConstantFactorSemanticAction(Constant * constant, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Factor * factor = calloc(1, sizeof(Factor));
 	factor->constant = constant;
 	factor->type = CONSTANT_FACTOR;
+	factor->position = position;
 	return factor;
 }
 
-Factor * InvocationFactorSemanticAction(char * function, ExpressionList * arguments) {
+Factor * InvocationFactorSemanticAction(char * function, ExpressionList * arguments, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Factor * factor = calloc(1, sizeof(Factor));
 	factor->function = function;
 	factor->arguments = arguments;
 	factor->type = INVOCATION_FACTOR;
+	factor->position = position;
 	return factor;
 }
 
-Factor * ListFactorSemanticAction(ExpressionList * elements) {
+Factor * ListFactorSemanticAction(ExpressionList * elements, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Factor * factor = calloc(1, sizeof(Factor));
 	factor->elements = elements;
 	factor->type = LIST_FACTOR;
+	factor->position = position;
 	return factor;
 }
 
-Factor * ParenthesizedFactorSemanticAction(Expression * expression) {
+Factor * ParenthesizedFactorSemanticAction(Expression * expression, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Factor * factor = calloc(1, sizeof(Factor));
 	factor->expression = expression;
 	factor->type = PARENTHESIZED_FACTOR;
+	factor->position = position;
 	return factor;
 }
 
-Factor * VariableFactorSemanticAction(char * variable) {
+Factor * VariableFactorSemanticAction(char * variable, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Factor * factor = calloc(1, sizeof(Factor));
 	factor->variable = variable;
 	factor->type = VARIABLE_FACTOR;
+	factor->position = position;
 	return factor;
 }
 
@@ -143,11 +148,11 @@ Factor * VariableFactorSemanticAction(char * variable) {
  * behave as a variable anywhere inside an expression, and this action copies
  * their name so that the node owns its own memory, like every other variable.
  */
-Factor * QuantifierFactorSemanticAction(const char * quantifier) {
+Factor * QuantifierFactorSemanticAction(const char * quantifier, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	char * name = calloc(1 + strlen(quantifier), sizeof(char));
 	strcpy(name, quantifier);
-	return VariableFactorSemanticAction(name);
+	return VariableFactorSemanticAction(name, position);
 }
 
 /** Expressions. */
@@ -192,11 +197,12 @@ ExpressionList * ExpressionListSemanticAction(ExpressionList * list, Expression 
 
 /** Goals and topics. */
 
-Attribute * AttributeSemanticAction(char * name, ExpressionList * values) {
+Attribute * AttributeSemanticAction(char * name, ExpressionList * values, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Attribute * attribute = calloc(1, sizeof(Attribute));
 	attribute->name = name;
 	attribute->values = values;
+	attribute->position = position;
 	return attribute;
 }
 
@@ -205,11 +211,11 @@ Attribute * AttributeSemanticAction(char * name, ExpressionList * values) {
  * reserved word, so the lexical-analyzer never emits it as an IDENTIFIER. The
  * name is written here instead of being carried by the token.
  */
-Attribute * MethodAttributeSemanticAction(ExpressionList * values) {
+Attribute * MethodAttributeSemanticAction(ExpressionList * values, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	char * name = calloc(7, sizeof(char));
 	strcpy(name, "method");
-	return AttributeSemanticAction(name, values);
+	return AttributeSemanticAction(name, values, position);
 }
 
 Member * AttributeMemberSemanticAction(Attribute * attribute) {
@@ -250,13 +256,14 @@ Goal * GoalSemanticAction(char * name, MemberList * members, Position position) 
 	return goal;
 }
 
-Topic * TopicSemanticAction(char * name, char * goal, MemberList * members, Position position) {
+Topic * TopicSemanticAction(char * name, char * goal, MemberList * members, Position position, Position goalPosition) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Topic * topic = calloc(1, sizeof(Topic));
 	topic->name = name;
 	topic->goal = goal;
 	topic->members = members;
 	topic->position = position;
+	topic->goalPosition = goalPosition;
 	return topic;
 }
 

@@ -1,2 +1,2 @@
 include <metodos>
-topic Automatas { method: Pomodoro(50m, 10m); }
+goal TLA { topic Automatas { method: Pomodoro(50m, 10m); } }
