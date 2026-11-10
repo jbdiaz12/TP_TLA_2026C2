@@ -34,6 +34,9 @@ static Symbol * _findTopicSymbol(const SymbolTable * table, const Topic * topic)
 static void _reportSemanticError(const Position position, const char * const format, ...);
 static void _resolveGoals(SymbolTable * table, const DeclarationList * declarations);
 static void _setGoal(const SymbolTable * table, const Topic * topic, Symbol * goal);
+static bool _isLevelAttribute(const char * name);
+static void _validateLevel(const SymbolTable * table, const Attribute * attribute);
+static void _validateLevels(const SymbolTable * table);
 static void _validateNestedTopics(const MemberList * members);
 static void _validateRequirements(const SymbolTable * table);
 static void _validateUniqueBlock(const Declaration ** first, const Declaration * declaration, const char * keyword);
@@ -89,6 +92,63 @@ static void _setGoal(const SymbolTable * table, const Topic * topic, Symbol * go
 	for (const MemberList * node = topic->members; node != NULL; node = node->next) {
 		if (node->member->type == TOPIC_MEMBER) {
 			_setGoal(table, node->member->topic, goal);
+		}
+	}
+}
+
+/**
+ * Whether an attribute takes a level of a scale as its value.
+ */
+static bool _isLevelAttribute(const char * name) {
+	return strcmp(name, "difficulty") == 0 || strcmp(name, "priority") == 0;
+}
+
+/**
+ * The value of an attribute like "difficulty" is a single level, declared in
+ * any scale. Every level belongs to a single scale, so the level alone tells
+ * which scale the attribute uses.
+ */
+static void _validateLevel(const SymbolTable * table, const Attribute * attribute) {
+	if (attribute->values->next != NULL) {
+		_reportSemanticError(attribute->position, "'%s' lleva un solo nivel.", attribute->name);
+		return;
+	}
+	const Expression * value = attribute->values->expression;
+	if (value->type != FACTOR_EXPRESSION || value->factor->type != VARIABLE_FACTOR) {
+		_reportSemanticError(attribute->position,
+			"'%s' lleva el nombre de un nivel de una escala (por ejemplo, 'alto').", attribute->name);
+		return;
+	}
+	const Factor * factor = value->factor;
+	if (findSymbol(table, LEVEL_SYMBOL, factor->variable) != NULL) {
+		return;
+	}
+	if (findSymbol(table, SCALE_SYMBOL, factor->variable) != NULL) {
+		_reportSemanticError(factor->position,
+			"'%s' es una escala, pero '%s' lleva uno de sus niveles.", factor->variable, attribute->name);
+	}
+	else {
+		_reportSemanticError(factor->position,
+			"el nivel '%s' no está declarado en ninguna escala.", factor->variable);
+	}
+}
+
+/**
+ * Validates the levels of every goal and topic.
+ */
+static void _validateLevels(const SymbolTable * table) {
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		const MemberList * members = NULL;
+		if (symbol->kind == GOAL_SYMBOL) {
+			members = symbol->goal->members;
+		}
+		else if (symbol->kind == TOPIC_SYMBOL) {
+			members = symbol->topic->members;
+		}
+		for (const MemberList * node = members; node != NULL; node = node->next) {
+			if (node->member->type == ATTRIBUTE_MEMBER && _isLevelAttribute(node->member->attribute->name)) {
+				_validateLevel(table, node->member->attribute);
+			}
 		}
 	}
 }
@@ -421,6 +481,7 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_declareSymbols(table, program->declarations);
 	_resolveGoals(table, program->declarations);
 	_validateRequirements(table);
+	_validateLevels(table);
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(program->declarations, node->declaration->method);

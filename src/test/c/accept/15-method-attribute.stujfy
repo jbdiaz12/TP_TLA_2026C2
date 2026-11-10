@@ -1,3 +1,4 @@
+scale nivel { medio < medioAlto < alto }
 goal TLA {
     topic Automatas {
         difficulty: medioAlto;

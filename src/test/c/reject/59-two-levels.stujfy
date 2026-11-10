@@ -1,0 +1,2 @@
+scale nivel { bajo < alto }
+goal TLA { topic A { difficulty: bajo, alto; } }
