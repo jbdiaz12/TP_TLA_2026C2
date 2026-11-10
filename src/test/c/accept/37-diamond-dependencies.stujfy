@@ -1,0 +1,6 @@
+goal TLA {
+    topic A { }
+    topic B { requires: A; }
+    topic C { requires: A; }
+    topic D { requires: B, C; }
+}

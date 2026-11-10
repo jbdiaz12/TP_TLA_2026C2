@@ -7,6 +7,18 @@ static Logger * _logger = NULL;
 /** The amount of errors reported by the current analysis. */
 static unsigned int _errors = 0;
 
+/** The state of a topic while the dependencies are searched for cycles. */
+typedef enum {
+	UNVISITED,
+	IN_PATH,
+	FINISHED
+} VisitState;
+
+typedef struct {
+	const Symbol * topic;
+	VisitState state;
+} Visit;
+
 /** Shutdown module's internal state. */
 void _shutdownSemanticAnalysisModule() {
 	if (_logger != NULL) {
@@ -34,7 +46,11 @@ static Symbol * _findTopicSymbol(const SymbolTable * table, const Topic * topic)
 static void _reportSemanticError(const Position position, const char * const format, ...);
 static void _resolveGoals(SymbolTable * table, const DeclarationList * declarations);
 static void _setGoal(const SymbolTable * table, const Topic * topic, Symbol * goal);
+static int _indexOfVisit(const Visit * visits, const int count, const Symbol * topic);
 static bool _isLevelAttribute(const char * name);
+static void _reportCycle(const Symbol ** path, const int depth, const Symbol * required, const Position position);
+static void _validateCycles(const SymbolTable * table);
+static void _visit(const SymbolTable * table, Visit * visits, const int count, const Symbol ** path, const int depth, const int index);
 static void _validateLevel(const SymbolTable * table, const Attribute * attribute);
 static void _validateLevels(const SymbolTable * table);
 static void _validateNestedTopics(const MemberList * members);
@@ -94,6 +110,109 @@ static void _setGoal(const SymbolTable * table, const Topic * topic, Symbol * go
 			_setGoal(table, node->member->topic, goal);
 		}
 	}
+}
+
+/**
+ * Finds the visit of a topic.
+ */
+static int _indexOfVisit(const Visit * visits, const int count, const Symbol * topic) {
+	for (int k = 0; k < count; ++k) {
+		if (visits[k].topic == topic) {
+			return k;
+		}
+	}
+	return -1;
+}
+
+/**
+ * Reports a cycle of dependencies, written from the topic where it starts
+ * back to that same topic (e.g., "A → B → C → A").
+ */
+static void _reportCycle(const Symbol ** path, const int depth, const Symbol * required, const Position position) {
+	int start = depth;
+	while (0 < start && path[start] != required) {
+		--start;
+	}
+	if (start == depth) {
+		_reportSemanticError(position, "el tema '%s' se requiere a sí mismo.", required->name);
+		return;
+	}
+	size_t length = strlen(required->name) + 1;
+	for (int k = start; k <= depth; ++k) {
+		length += strlen(path[k]->name) + strlen(" → ");
+	}
+	char * cycle = calloc(length, sizeof(char));
+	for (int k = start; k <= depth; ++k) {
+		strcat(cycle, path[k]->name);
+		strcat(cycle, " → ");
+	}
+	strcat(cycle, required->name);
+	_reportSemanticError(position, "las dependencias forman un ciclo: %s.", cycle);
+	free(cycle);
+}
+
+/**
+ * The dependencies between topics form a directed graph, and a cycle in it
+ * means that no topic of the cycle can ever be studied first. A depth-first
+ * search finds every cycle once: when it reaches a topic that is still in
+ * the current path.
+ */
+static void _validateCycles(const SymbolTable * table) {
+	int count = 0;
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind == TOPIC_SYMBOL) {
+			++count;
+		}
+	}
+	if (count == 0) {
+		return;
+	}
+	Visit * visits = calloc(count, sizeof(Visit));
+	const Symbol ** path = calloc(count, sizeof(Symbol *));
+	int k = 0;
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind == TOPIC_SYMBOL) {
+			visits[k++] = (Visit) { .topic = symbol, .state = UNVISITED };
+		}
+	}
+	for (k = 0; k < count; ++k) {
+		if (visits[k].state == UNVISITED) {
+			_visit(table, visits, count, path, 0, k);
+		}
+	}
+	free(path);
+	free(visits);
+}
+
+/**
+ * Visits a topic and, recursively, the topics it requires.
+ */
+static void _visit(const SymbolTable * table, Visit * visits, const int count, const Symbol ** path, const int depth, const int index) {
+	visits[index].state = IN_PATH;
+	path[depth] = visits[index].topic;
+	for (const MemberList * node = visits[index].topic->topic->members; node != NULL; node = node->next) {
+		if (node->member->type != ATTRIBUTE_MEMBER || strcmp(node->member->attribute->name, "requires") != 0) {
+			continue;
+		}
+		for (const ExpressionList * value = node->member->attribute->values; value != NULL; value = value->next) {
+			const Expression * expression = value->expression;
+			if (expression->type != FACTOR_EXPRESSION || expression->factor->type != VARIABLE_FACTOR) {
+				continue;
+			}
+			const Symbol * required = findSymbol(table, TOPIC_SYMBOL, expression->factor->variable);
+			if (required == NULL || required->kind != TOPIC_SYMBOL) {
+				continue;
+			}
+			const int next = _indexOfVisit(visits, count, required);
+			if (visits[next].state == IN_PATH) {
+				_reportCycle(path, depth, required, expression->factor->position);
+			}
+			else if (visits[next].state == UNVISITED) {
+				_visit(table, visits, count, path, depth + 1, next);
+			}
+		}
+	}
+	visits[index].state = FINISHED;
 }
 
 /**
@@ -482,6 +601,7 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_resolveGoals(table, program->declarations);
 	_validateRequirements(table);
 	_validateLevels(table);
+	_validateCycles(table);
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(program->declarations, node->declaration->method);

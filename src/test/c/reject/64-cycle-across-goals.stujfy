@@ -1,0 +1,2 @@
+goal TLA { topic A { requires: B; } }
+goal Fisica { topic B { requires: A; } }
