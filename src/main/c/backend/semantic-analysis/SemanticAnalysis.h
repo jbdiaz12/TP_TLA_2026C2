@@ -5,6 +5,7 @@
 #include "../../support/logging/Logger.h"
 #include "../../support/type/CompilationStatus.h"
 #include "../../support/type/ModuleDestructor.h"
+#include "SymbolTable.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>

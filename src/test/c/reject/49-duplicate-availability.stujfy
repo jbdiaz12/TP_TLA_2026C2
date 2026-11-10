@@ -1,0 +1,2 @@
+availability { monday: 1h; }
+availability { tuesday: 1h; }

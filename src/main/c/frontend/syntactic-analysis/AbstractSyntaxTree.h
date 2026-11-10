@@ -200,11 +200,13 @@ struct ExpressionList {
 struct LevelList {
 	char * level;
 	LevelList * next;
+	Position position;
 };
 
 struct Scale {
 	char * name;
 	LevelList * levels;
+	Position position;
 };
 
 /**
@@ -287,6 +289,7 @@ struct Goal {
 	char * name;
 	/** NULL when the block is empty. */
 	MemberList * members;
+	Position position;
 };
 
 struct Topic {
@@ -295,6 +298,7 @@ struct Topic {
 	char * goal;
 	/** NULL when the block is empty. */
 	MemberList * members;
+	Position position;
 };
 
 /**
@@ -385,6 +389,8 @@ struct Declaration {
 		Topic * topic;
 	};
 	DeclarationType type;
+	/** Where the declaration starts (e.g., its "plan" or "availability" keyword). */
+	Position position;
 };
 
 struct DeclarationList {

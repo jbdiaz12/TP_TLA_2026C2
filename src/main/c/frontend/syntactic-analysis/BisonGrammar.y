@@ -282,14 +282,14 @@ declarationList: declaration															{ $$ = SingletonDeclarationListSemant
 	| declarationList[list] declaration[item]											{ $$ = DeclarationListSemanticAction($list, $item); }
 	;
 
-declaration: goalDeclaration															{ $$ = GoalDeclarationSemanticAction($1); }
-	| topicDeclaration																	{ $$ = TopicDeclarationSemanticAction($1); }
-	| scaleDeclaration																	{ $$ = ScaleDeclarationSemanticAction($1); }
-	| methodDeclaration																	{ $$ = MethodDeclarationSemanticAction($1); }
-	| availabilityDeclaration															{ $$ = AvailabilityDeclarationSemanticAction($1); }
-	| constraintsDeclaration															{ $$ = ConstraintsDeclarationSemanticAction($1); }
-	| rulesDeclaration																	{ $$ = RulesDeclarationSemanticAction($1); }
-	| planDeclaration																	{ $$ = PlanDeclarationSemanticAction($1); }
+declaration: goalDeclaration															{ $$ = GoalDeclarationSemanticAction($1, POSITION(@1)); }
+	| topicDeclaration																	{ $$ = TopicDeclarationSemanticAction($1, POSITION(@1)); }
+	| scaleDeclaration																	{ $$ = ScaleDeclarationSemanticAction($1, POSITION(@1)); }
+	| methodDeclaration																	{ $$ = MethodDeclarationSemanticAction($1, POSITION(@1)); }
+	| availabilityDeclaration															{ $$ = AvailabilityDeclarationSemanticAction($1, POSITION(@1)); }
+	| constraintsDeclaration															{ $$ = ConstraintsDeclarationSemanticAction($1, POSITION(@1)); }
+	| rulesDeclaration																	{ $$ = RulesDeclarationSemanticAction($1, POSITION(@1)); }
+	| planDeclaration																	{ $$ = PlanDeclarationSemanticAction($1, POSITION(@1)); }
 	;
 
 /** Availability. */
@@ -346,11 +346,11 @@ attributeList: attribute																{ $$ = SingletonAttributeListSemanticAct
 
 /** Scales. */
 
-scaleDeclaration: SCALE IDENTIFIER[name] OPEN_BRACE levelList[levels] CLOSE_BRACE		{ $$ = ScaleSemanticAction($name, $levels); }
+scaleDeclaration: SCALE IDENTIFIER[name] OPEN_BRACE levelList[levels] CLOSE_BRACE		{ $$ = ScaleSemanticAction($name, $levels, POSITION(@name)); }
 	;
 
-levelList: IDENTIFIER[level]															{ $$ = SingletonLevelListSemanticAction($level); }
-	| levelList[list] LESS IDENTIFIER[item]												{ $$ = LevelListSemanticAction($list, $item); }
+levelList: IDENTIFIER[level]															{ $$ = SingletonLevelListSemanticAction($level, POSITION(@level)); }
+	| levelList[list] LESS IDENTIFIER[item]												{ $$ = LevelListSemanticAction($list, $item, POSITION(@item)); }
 	;
 
 /** Methods. */
@@ -380,14 +380,14 @@ statement: SESSION expression[duration] SEMICOLON										{ $$ = DurationStatem
 
 /** Goals and topics. */
 
-goalDeclaration: GOAL IDENTIFIER[name] OPEN_BRACE memberList[members] CLOSE_BRACE		{ $$ = GoalSemanticAction($name, $members); }
-	| GOAL IDENTIFIER[name] OPEN_BRACE CLOSE_BRACE										{ $$ = GoalSemanticAction($name, NULL); }
+goalDeclaration: GOAL IDENTIFIER[name] OPEN_BRACE memberList[members] CLOSE_BRACE		{ $$ = GoalSemanticAction($name, $members, POSITION(@name)); }
+	| GOAL IDENTIFIER[name] OPEN_BRACE CLOSE_BRACE										{ $$ = GoalSemanticAction($name, NULL, POSITION(@name)); }
 	;
 
-topicDeclaration: TOPIC IDENTIFIER[name] OPEN_BRACE memberList[members] CLOSE_BRACE		{ $$ = TopicSemanticAction($name, NULL, $members); }
-	| TOPIC IDENTIFIER[name] OPEN_BRACE CLOSE_BRACE										{ $$ = TopicSemanticAction($name, NULL, NULL); }
-	| TOPIC IDENTIFIER[name] IN IDENTIFIER[goal] OPEN_BRACE memberList[members] CLOSE_BRACE	{ $$ = TopicSemanticAction($name, $goal, $members); }
-	| TOPIC IDENTIFIER[name] IN IDENTIFIER[goal] OPEN_BRACE CLOSE_BRACE					{ $$ = TopicSemanticAction($name, $goal, NULL); }
+topicDeclaration: TOPIC IDENTIFIER[name] OPEN_BRACE memberList[members] CLOSE_BRACE		{ $$ = TopicSemanticAction($name, NULL, $members, POSITION(@name)); }
+	| TOPIC IDENTIFIER[name] OPEN_BRACE CLOSE_BRACE										{ $$ = TopicSemanticAction($name, NULL, NULL, POSITION(@name)); }
+	| TOPIC IDENTIFIER[name] IN IDENTIFIER[goal] OPEN_BRACE memberList[members] CLOSE_BRACE	{ $$ = TopicSemanticAction($name, $goal, $members, POSITION(@name)); }
+	| TOPIC IDENTIFIER[name] IN IDENTIFIER[goal] OPEN_BRACE CLOSE_BRACE					{ $$ = TopicSemanticAction($name, $goal, NULL, POSITION(@name)); }
 	;
 
 memberList: member																		{ $$ = SingletonMemberListSemanticAction($1); }

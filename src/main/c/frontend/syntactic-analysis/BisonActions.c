@@ -241,43 +241,52 @@ MemberList * MemberListSemanticAction(MemberList * list, Member * member) {
 	return list;
 }
 
-Goal * GoalSemanticAction(char * name, MemberList * members) {
+Goal * GoalSemanticAction(char * name, MemberList * members, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Goal * goal = calloc(1, sizeof(Goal));
 	goal->name = name;
 	goal->members = members;
+	goal->position = position;
 	return goal;
 }
 
-Topic * TopicSemanticAction(char * name, char * goal, MemberList * members) {
+Topic * TopicSemanticAction(char * name, char * goal, MemberList * members, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Topic * topic = calloc(1, sizeof(Topic));
 	topic->name = name;
 	topic->goal = goal;
 	topic->members = members;
+	topic->position = position;
 	return topic;
 }
 
 /** Scales. */
 
-LevelList * SingletonLevelListSemanticAction(char * level) {
+LevelList * SingletonLevelListSemanticAction(char * level, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	LevelList * list = calloc(1, sizeof(LevelList));
 	list->level = level;
+	list->position = position;
 	return list;
 }
 
-LevelList * LevelListSemanticAction(LevelList * list, char * level) {
+LevelList * LevelListSemanticAction(LevelList * list, char * level, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
-	APPEND(LevelList, list, level, level);
+	LevelList * item = SingletonLevelListSemanticAction(level, position);
+	LevelList * last = list;
+	while (last->next != NULL) {
+		last = last->next;
+	}
+	last->next = item;
 	return list;
 }
 
-Scale * ScaleSemanticAction(char * name, LevelList * levels) {
+Scale * ScaleSemanticAction(char * name, LevelList * levels, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Scale * scale = calloc(1, sizeof(Scale));
 	scale->name = name;
 	scale->levels = levels;
+	scale->position = position;
 	return scale;
 }
 
@@ -498,70 +507,78 @@ AttributeList * AttributeListSemanticAction(AttributeList * list, Attribute * at
 
 /** Program. */
 
-Declaration * AvailabilityDeclarationSemanticAction(Availability * availability) {
+Declaration * AvailabilityDeclarationSemanticAction(Availability * availability, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Declaration * declaration = calloc(1, sizeof(Declaration));
 	declaration->availability = availability;
 	declaration->type = AVAILABILITY_DECLARATION;
+	declaration->position = position;
 	return declaration;
 }
 
-Declaration * ConstraintsDeclarationSemanticAction(ConstraintList * constraints) {
+Declaration * ConstraintsDeclarationSemanticAction(ConstraintList * constraints, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Declaration * declaration = calloc(1, sizeof(Declaration));
 	declaration->constraints = constraints;
 	declaration->type = CONSTRAINTS_DECLARATION;
+	declaration->position = position;
 	return declaration;
 }
 
 /**
  * The attributes are NULL when the block of the plan is empty.
  */
-Declaration * PlanDeclarationSemanticAction(AttributeList * attributes) {
+Declaration * PlanDeclarationSemanticAction(AttributeList * attributes, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Declaration * declaration = calloc(1, sizeof(Declaration));
 	declaration->plan = attributes;
 	declaration->type = PLAN_DECLARATION;
+	declaration->position = position;
 	return declaration;
 }
 
-Declaration * RulesDeclarationSemanticAction(RuleList * rules) {
+Declaration * RulesDeclarationSemanticAction(RuleList * rules, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Declaration * declaration = calloc(1, sizeof(Declaration));
 	declaration->rules = rules;
 	declaration->type = RULES_DECLARATION;
+	declaration->position = position;
 	return declaration;
 }
 
-Declaration * MethodDeclarationSemanticAction(Method * method) {
+Declaration * MethodDeclarationSemanticAction(Method * method, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Declaration * declaration = calloc(1, sizeof(Declaration));
 	declaration->method = method;
 	declaration->type = METHOD_DECLARATION;
+	declaration->position = position;
 	return declaration;
 }
 
-Declaration * ScaleDeclarationSemanticAction(Scale * scale) {
+Declaration * ScaleDeclarationSemanticAction(Scale * scale, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Declaration * declaration = calloc(1, sizeof(Declaration));
 	declaration->scale = scale;
 	declaration->type = SCALE_DECLARATION;
+	declaration->position = position;
 	return declaration;
 }
 
-Declaration * GoalDeclarationSemanticAction(Goal * goal) {
+Declaration * GoalDeclarationSemanticAction(Goal * goal, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Declaration * declaration = calloc(1, sizeof(Declaration));
 	declaration->goal = goal;
 	declaration->type = GOAL_DECLARATION;
+	declaration->position = position;
 	return declaration;
 }
 
-Declaration * TopicDeclarationSemanticAction(Topic * topic) {
+Declaration * TopicDeclarationSemanticAction(Topic * topic, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Declaration * declaration = calloc(1, sizeof(Declaration));
 	declaration->topic = topic;
 	declaration->type = TOPIC_DECLARATION;
+	declaration->position = position;
 	return declaration;
 }
 

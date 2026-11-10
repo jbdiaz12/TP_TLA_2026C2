@@ -23,11 +23,145 @@ ModuleDestructor initializeSemanticAnalysisModule() {
 
 /* PRIVATE FUNCTIONS */
 
+static Symbol * _declare(SymbolTable * table, const SymbolKind kind, const char * name, const Position position);
+static void _declareMembers(SymbolTable * table, const MemberList * members, Symbol * goal);
+static void _declareScale(SymbolTable * table, const Scale * scale);
+static void _declareSymbols(SymbolTable * table, const DeclarationList * declarations);
+static void _declareTopic(SymbolTable * table, const Topic * topic, Symbol * goal);
+static const char * _describe(const Position position);
 static const Method * _findPreviousMethod(const DeclarationList * declarations, const Method * method);
 static void _reportSemanticError(const Position position, const char * const format, ...);
+static void _validateUniqueBlock(const Declaration ** first, const Declaration * declaration, const char * keyword);
 static void _validateMethod(const DeclarationList * declarations, const Method * method);
 static void _validateMethodName(const DeclarationList * declarations, const Method * method);
 static void _validateParameters(const Method * method);
+
+/**
+ * Declares a goal, a topic or a scale, and reports it if its name is already
+ * taken. The symbol is added anyway, so the rest of the analysis can go on.
+ */
+static Symbol * _declare(SymbolTable * table, const SymbolKind kind, const char * name, const Position position) {
+	const Symbol * previous = findSymbol(table, kind, name);
+	if (previous == NULL) {
+		return addSymbol(table, kind, name, position);
+	}
+	if (previous->kind != kind) {
+		_reportSemanticError(position,
+			"ya hay %s llamado '%s' %s; los objetivos y los temas no pueden compartir nombre.",
+			(previous->kind == GOAL_SYMBOL) ? "un objetivo" : "un tema", name, _describe(previous->position));
+	}
+	else if (kind == GOAL_SYMBOL) {
+		_reportSemanticError(position, "el objetivo '%s' ya está declarado %s.", name, _describe(previous->position));
+	}
+	else if (kind == TOPIC_SYMBOL) {
+		_reportSemanticError(position, "el tema '%s' ya está declarado %s.", name, _describe(previous->position));
+	}
+	else {
+		_reportSemanticError(position, "la escala '%s' ya está declarada %s.", name, _describe(previous->position));
+	}
+	return addSymbol(table, kind, name, position);
+}
+
+/**
+ * Declares the topics nested inside a goal or a topic, which belong to the
+ * same goal.
+ */
+static void _declareMembers(SymbolTable * table, const MemberList * members, Symbol * goal) {
+	for (const MemberList * node = members; node != NULL; node = node->next) {
+		if (node->member->type == TOPIC_MEMBER) {
+			_declareTopic(table, node->member->topic, goal);
+		}
+	}
+}
+
+/**
+ * Declares a scale and its levels, from the lowest to the highest. A level
+ * belongs to a single scale, so an attribute like "difficulty: alto" always
+ * identifies the scale it uses.
+ */
+static void _declareScale(SymbolTable * table, const Scale * scale) {
+	Symbol * symbol = _declare(table, SCALE_SYMBOL, scale->name, scale->position);
+	symbol->scale = scale;
+	int rank = 0;
+	for (const LevelList * node = scale->levels; node != NULL; node = node->next) {
+		const Symbol * previous = findSymbol(table, LEVEL_SYMBOL, node->level);
+		if (previous != NULL && previous->owner == symbol) {
+			_reportSemanticError(node->position,
+				"el nivel '%s' está repetido en la escala '%s'.", node->level, scale->name);
+		}
+		else if (previous != NULL) {
+			_reportSemanticError(node->position,
+				"el nivel '%s' ya pertenece a la escala '%s' (%s); cada nivel pertenece a una sola escala.",
+				node->level, previous->owner->name, _describe(previous->position));
+		}
+		Symbol * level = addSymbol(table, LEVEL_SYMBOL, node->level, node->position);
+		level->owner = symbol;
+		level->rank = rank++;
+	}
+}
+
+/**
+ * Declares every goal, topic, scale and level of the program, in the order
+ * they're written, and checks that the blocks that describe the whole plan
+ * are declared only once.
+ */
+static void _declareSymbols(SymbolTable * table, const DeclarationList * declarations) {
+	const Declaration * availability = NULL;
+	const Declaration * plan = NULL;
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		const Declaration * declaration = node->declaration;
+		switch (declaration->type) {
+			case GOAL_DECLARATION: {
+				Symbol * goal = _declare(table, GOAL_SYMBOL, declaration->goal->name, declaration->goal->position);
+				goal->goal = declaration->goal;
+				_declareMembers(table, declaration->goal->members, goal);
+				break;
+			}
+			case TOPIC_DECLARATION:
+				_declareTopic(table, declaration->topic, NULL);
+				break;
+			case SCALE_DECLARATION:
+				_declareScale(table, declaration->scale);
+				break;
+			case AVAILABILITY_DECLARATION:
+				_validateUniqueBlock(&availability, declaration, "availability");
+				break;
+			case PLAN_DECLARATION:
+				_validateUniqueBlock(&plan, declaration, "plan");
+				break;
+			default:
+				break;
+		}
+	}
+}
+
+/**
+ * Declares a topic and the topics nested inside it. The goal of a topic
+ * declared outside of any goal ("topic X in Goal") is resolved later, once
+ * every goal is known.
+ */
+static void _declareTopic(SymbolTable * table, const Topic * topic, Symbol * goal) {
+	Symbol * symbol = _declare(table, TOPIC_SYMBOL, topic->name, topic->position);
+	symbol->topic = topic;
+	symbol->owner = goal;
+	_declareMembers(table, topic->members, goal);
+}
+
+/**
+ * Describes where something was declared, to point at it from a message
+ * (e.g., "en la línea 3", or "en <metodos> (línea 3)"). The description is
+ * overwritten by the next call, so it's used only once per message.
+ */
+static const char * _describe(const Position position) {
+	static char description[256];
+	if (position.file != NULL) {
+		snprintf(description, sizeof(description), "en %s (línea %d)", position.file, position.line);
+	}
+	else {
+		snprintf(description, sizeof(description), "en la línea %d", position.line);
+	}
+	return description;
+}
 
 /**
  * Finds a method with the same name, declared before the specified one. The
@@ -67,6 +201,20 @@ static void _reportSemanticError(const Position position, const char * const for
 	va_end(arguments);
 	fprintf(stderr, "\n");
 	++_errors;
+}
+
+/**
+ * A block that describes the whole plan (e.g., "plan" or "availability") is
+ * declared only once, because two of them would contradict each other.
+ */
+static void _validateUniqueBlock(const Declaration ** first, const Declaration * declaration, const char * keyword) {
+	if (*first == NULL) {
+		*first = declaration;
+	}
+	else {
+		_reportSemanticError(declaration->position,
+			"ya hay un bloque '%s' %s; se declara una sola vez.", keyword, _describe((*first)->position));
+	}
 }
 
 static void _validateMethod(const DeclarationList * declarations, const Method * method) {
@@ -148,11 +296,14 @@ static void _validateParameters(const Method * method) {
 CompilationStatus executeSemanticAnalysis(Program * program) {
 	logDebugging(_logger, "Analyzing...");
 	_errors = 0;
+	SymbolTable * table = createSymbolTable();
+	_declareSymbols(table, program->declarations);
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(program->declarations, node->declaration->method);
 		}
 	}
+	destroySymbolTable(table);
 	logDebugging(_logger, "Analysis is done (errors=%u).", _errors);
 	return (_errors == 0) ? SUCCEEDED : FAILED;
 }

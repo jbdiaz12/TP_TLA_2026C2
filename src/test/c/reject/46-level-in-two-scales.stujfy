@@ -1,0 +1,2 @@
+scale dificultad { bajo < alto }
+scale prioridad { bajo < urgente }

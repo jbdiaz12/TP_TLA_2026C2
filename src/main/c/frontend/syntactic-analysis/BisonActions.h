@@ -54,15 +54,15 @@ Member * TopicMemberSemanticAction(Topic * topic);
 MemberList * MemberListSemanticAction(MemberList * list, Member * member);
 MemberList * SingletonMemberListSemanticAction(Member * member);
 
-Goal * GoalSemanticAction(char * name, MemberList * members);
-Topic * TopicSemanticAction(char * name, char * goal, MemberList * members);
+Goal * GoalSemanticAction(char * name, MemberList * members, Position position);
+Topic * TopicSemanticAction(char * name, char * goal, MemberList * members, Position position);
 
 /** Scales. */
 
-LevelList * LevelListSemanticAction(LevelList * list, char * level);
-LevelList * SingletonLevelListSemanticAction(char * level);
+LevelList * LevelListSemanticAction(LevelList * list, char * level, Position position);
+LevelList * SingletonLevelListSemanticAction(char * level, Position position);
 
-Scale * ScaleSemanticAction(char * name, LevelList * levels);
+Scale * ScaleSemanticAction(char * name, LevelList * levels, Position position);
 
 /** Methods. */
 
@@ -116,14 +116,14 @@ AttributeList * SingletonAttributeListSemanticAction(Attribute * attribute);
 
 /** Program. */
 
-Declaration * AvailabilityDeclarationSemanticAction(Availability * availability);
-Declaration * ConstraintsDeclarationSemanticAction(ConstraintList * constraints);
-Declaration * GoalDeclarationSemanticAction(Goal * goal);
-Declaration * PlanDeclarationSemanticAction(AttributeList * attributes);
-Declaration * RulesDeclarationSemanticAction(RuleList * rules);
-Declaration * MethodDeclarationSemanticAction(Method * method);
-Declaration * ScaleDeclarationSemanticAction(Scale * scale);
-Declaration * TopicDeclarationSemanticAction(Topic * topic);
+Declaration * AvailabilityDeclarationSemanticAction(Availability * availability, Position position);
+Declaration * ConstraintsDeclarationSemanticAction(ConstraintList * constraints, Position position);
+Declaration * GoalDeclarationSemanticAction(Goal * goal, Position position);
+Declaration * PlanDeclarationSemanticAction(AttributeList * attributes, Position position);
+Declaration * RulesDeclarationSemanticAction(RuleList * rules, Position position);
+Declaration * MethodDeclarationSemanticAction(Method * method, Position position);
+Declaration * ScaleDeclarationSemanticAction(Scale * scale, Position position);
+Declaration * TopicDeclarationSemanticAction(Topic * topic, Position position);
 
 DeclarationList * DeclarationListSemanticAction(DeclarationList * list, Declaration * declaration);
 DeclarationList * SingletonDeclarationListSemanticAction(Declaration * declaration);
