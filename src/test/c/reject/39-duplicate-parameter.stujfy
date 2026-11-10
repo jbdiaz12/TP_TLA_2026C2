@@ -1,0 +1,1 @@
+method Lectura(bloque: duration, bloque: integer) { session bloque; }

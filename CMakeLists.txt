@@ -33,6 +33,7 @@ if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
 	# Defines the entry-point of the application, and the source-codes (*.c extension).
 	# The header files (*.h extension), are automatically included from the source-codes.
 	add_executable(Flex-Bison-Compiler
+		src/main/c/backend/semantic-analysis/SemanticAnalysis.c
 		src/main/c/EntryPoint.c
 		src/main/c/frontend/Frontend.c
 		src/main/c/frontend/lexical-analysis/FlexActions.c

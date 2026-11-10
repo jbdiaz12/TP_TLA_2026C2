@@ -6,6 +6,19 @@
 #include <stdio.h>
 
 /**
+ * Prints the beginning of a syntax error message, with the file (only when
+ * it isn't the main program) and the location of the error.
+ */
+static void _printSyntaxErrorPrefix(const YYLTYPE * location) {
+	if (location->file != NULL) {
+		fprintf(stderr, "Error sintáctico en %s (%d:%d): ", location->file, location->first_line, location->first_column);
+	}
+	else {
+		fprintf(stderr, "Error sintáctico (%d:%d): ", location->first_line, location->first_column);
+	}
+}
+
+/**
  * The error reporting function for Bison parser. Syntax errors are reported
  * by "yyreport_syntax_error" (see the epilogue), so this function only
  * receives the remaining failures, such as running out of memory.
@@ -14,7 +27,8 @@
  * @see https://www.gnu.org/software/bison/manual/html_node/Tracking-Locations.html
  */
 void yyerror(const YYLTYPE * location, const char * message) {
-	fprintf(stderr, "Error sintáctico (%d:%d): %s.\n", location->first_line, location->first_column, message);
+	_printSyntaxErrorPrefix(location);
+	fprintf(stderr, "%s.\n", message);
 }
 
 /**
@@ -27,13 +41,39 @@ void yyerror(const YYLTYPE * location, const char * message) {
 			(location).first_line = YYRHSLOC((rhs), 1).first_line; \
 			(location).last_column = YYRHSLOC((rhs), (k)).last_column; \
 			(location).last_line = YYRHSLOC((rhs), (k)).last_line; \
+			(location).file = YYRHSLOC((rhs), 1).file; \
 		} else { \
 			(location).first_column = (location).last_column = YYRHSLOC((rhs), 0).last_column; \
 			(location).first_line = (location).last_line = YYRHSLOC((rhs), 0).last_line; \
+			(location).file = YYRHSLOC((rhs), 0).file; \
 		} \
 	} while (0)
 
 %}
+
+/**
+ * The location of a symbol. Besides its lines and columns, it remembers the
+ * file that contains it, because a program can include other files. The file
+ * is NULL for the main program, which is read from the standard input.
+ *
+ * @see https://www.gnu.org/software/bison/manual/html_node/Location-Type.html
+ */
+%code requires {
+	typedef struct YYLTYPE {
+		int first_line;
+		int first_column;
+		int last_line;
+		int last_column;
+		const char * file;
+	} YYLTYPE;
+	#define YYLTYPE_IS_DECLARED 1
+	#define YYLTYPE_IS_TRIVIAL 1
+}
+
+/** Converts the location of a symbol into the position that the AST keeps. */
+%code {
+	#define POSITION(location) ((Position) { .file = (location).file, .line = (location).first_line, .column = (location).first_column })
+}
 
 // You touch this, and you die.
 %define api.pure full
@@ -140,6 +180,7 @@ void yyerror(const YYLTYPE * location, const char * message) {
 %token <token> AND "and"
 %token <token> AVAILABILITY "availability"
 %token <token> CONSTRAINTS "constraints"
+%token <token> DEFAULT "default"
 %token <token> FOR "for"
 %token <token> GOAL "goal"
 %token <token> IN "in"
@@ -314,15 +355,16 @@ levelList: IDENTIFIER[level]															{ $$ = SingletonLevelListSemanticActi
 
 /** Methods. */
 
-methodDeclaration: METHOD IDENTIFIER[name] OPEN_PARENTHESIS CLOSE_PARENTHESIS OPEN_BRACE statementList[body] CLOSE_BRACE							{ $$ = MethodSemanticAction($name, NULL, $body); }
-	| METHOD IDENTIFIER[name] OPEN_PARENTHESIS parameterList[parameters] CLOSE_PARENTHESIS OPEN_BRACE statementList[body] CLOSE_BRACE				{ $$ = MethodSemanticAction($name, $parameters, $body); }
+methodDeclaration: METHOD IDENTIFIER[name] OPEN_PARENTHESIS CLOSE_PARENTHESIS OPEN_BRACE statementList[body] CLOSE_BRACE							{ $$ = MethodSemanticAction($name, NULL, $body, POSITION(@name)); }
+	| METHOD IDENTIFIER[name] OPEN_PARENTHESIS parameterList[parameters] CLOSE_PARENTHESIS OPEN_BRACE statementList[body] CLOSE_BRACE				{ $$ = MethodSemanticAction($name, $parameters, $body, POSITION(@name)); }
 	;
 
 parameterList: parameter																{ $$ = SingletonParameterListSemanticAction($1); }
 	| parameterList[list] COMMA parameter[item]											{ $$ = ParameterListSemanticAction($list, $item); }
 	;
 
-parameter: IDENTIFIER[name] COLON IDENTIFIER[type]										{ $$ = ParameterSemanticAction($name, $type); }
+parameter: IDENTIFIER[name] COLON IDENTIFIER[type]										{ $$ = ParameterSemanticAction($name, $type, NULL, POSITION(@name)); }
+	| IDENTIFIER[name] COLON IDENTIFIER[type] DEFAULT expression[value]					{ $$ = ParameterSemanticAction($name, $type, $value, POSITION(@name)); }
 	;
 
 statementList: statement																{ $$ = SingletonStatementListSemanticAction($1); }
@@ -420,6 +462,9 @@ static void _printSymbol(const yysymbol_kind_t symbol) {
 		case YYSYMBOL_TIME:
 			fprintf(stderr, "%s", yysymbol_name(symbol));
 			break;
+		case YYSYMBOL_YYEOF:
+			fprintf(stderr, "el final del archivo");
+			break;
 		default:
 			fprintf(stderr, "'%s'", yysymbol_name(symbol));
 			break;
@@ -439,8 +484,7 @@ static int yyreport_syntax_error(const yypcontext_t * context) {
 	if (found == YYSYMBOL_UNKNOWN || found == YYSYMBOL_EXCEPTION) {
 		return 0;
 	}
-	const YYLTYPE * location = yypcontext_location(context);
-	fprintf(stderr, "Error sintáctico (%d:%d): ", location->first_line, location->first_column);
+	_printSyntaxErrorPrefix(yypcontext_location(context));
 	if (found == YYSYMBOL_YYEOF) {
 		fprintf(stderr, "el programa termina antes de tiempo");
 	}

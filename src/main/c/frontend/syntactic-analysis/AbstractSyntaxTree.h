@@ -52,6 +52,17 @@ typedef struct Statement Statement;
 typedef struct Topic Topic;
 
 /**
+ * Where a symbol was written, so the semantic-analysis can report its errors
+ * there. The file is NULL for the main program, and otherwise it's the name
+ * of an included file (e.g., "<metodos>"), owned by the lexical-analyzer.
+ */
+typedef struct {
+	const char * file;
+	int line;
+	int column;
+} Position;
+
+/**
  * Node types for the Abstract Syntax Tree (AST).
  *
  * The names of this enumerations must never collide with the token labels
@@ -203,6 +214,9 @@ struct Scale {
 struct Parameter {
 	char * name;
 	char * type;
+	/** The value used when an invocation omits it, or NULL if it's required. */
+	Expression * defaultValue;
+	Position position;
 };
 
 struct ParameterList {
@@ -244,6 +258,7 @@ struct Method {
 	/** NULL when the method declares no parameters. */
 	ParameterList * parameters;
 	StatementList * body;
+	Position position;
 };
 
 /**

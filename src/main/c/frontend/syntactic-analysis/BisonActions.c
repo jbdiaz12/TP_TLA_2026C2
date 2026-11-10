@@ -283,11 +283,13 @@ Scale * ScaleSemanticAction(char * name, LevelList * levels) {
 
 /** Methods. */
 
-Parameter * ParameterSemanticAction(char * name, char * type) {
+Parameter * ParameterSemanticAction(char * name, char * type, Expression * defaultValue, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Parameter * parameter = calloc(1, sizeof(Parameter));
 	parameter->name = name;
 	parameter->type = type;
+	parameter->defaultValue = defaultValue;
+	parameter->position = position;
 	return parameter;
 }
 
@@ -357,12 +359,13 @@ StatementList * StatementListSemanticAction(StatementList * list, Statement * st
 	return list;
 }
 
-Method * MethodSemanticAction(char * name, ParameterList * parameters, StatementList * body) {
+Method * MethodSemanticAction(char * name, ParameterList * parameters, StatementList * body, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Method * method = calloc(1, sizeof(Method));
 	method->name = name;
 	method->parameters = parameters;
 	method->body = body;
+	method->position = position;
 	return method;
 }
 

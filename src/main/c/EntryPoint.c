@@ -1,3 +1,4 @@
+#include "backend/semantic-analysis/SemanticAnalysis.h"
 #include "frontend/Frontend.h"
 #include "frontend/lexical-analysis/FlexActions.h"
 #include "frontend/syntactic-analysis/BisonActions.h"
@@ -24,12 +25,20 @@ const int main(const int length, const char ** arguments) {
 		initializeAbstractSyntaxTreeModule(),
 		initializeFlexActionsModule(lexicalAnalyzer),
 		initializeBisonActionsModule(&compilerState),
-		initializeFrontendModule(lexicalAnalyzer)
+		initializeFrontendModule(lexicalAnalyzer),
+		initializeSemanticAnalysisModule()
 	};
 	CompilationStatus compilationStatus = executeSyntacticAnalysis();
 	Program * program = compilerState.abstractSyntaxtTree;
 	if (compilationStatus == SUCCEEDED) {
 		logInformation(logger, "The syntactic-analysis phase accepts the input program.");
+		compilationStatus = executeSemanticAnalysis(program);
+		if (compilationStatus == SUCCEEDED) {
+			logInformation(logger, "The semantic-analysis phase accepts the input program.");
+		}
+		else {
+			logError(logger, "The semantic-analysis phase rejects the input program.");
+		}
 	}
 	else {
 		logError(logger, "The syntactic-analysis phase rejects the input program.");

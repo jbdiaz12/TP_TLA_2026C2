@@ -66,7 +66,7 @@ Scale * ScaleSemanticAction(char * name, LevelList * levels);
 
 /** Methods. */
 
-Parameter * ParameterSemanticAction(char * name, char * type);
+Parameter * ParameterSemanticAction(char * name, char * type, Expression * defaultValue, Position position);
 
 ParameterList * ParameterListSemanticAction(ParameterList * list, Parameter * parameter);
 ParameterList * SingletonParameterListSemanticAction(Parameter * parameter);
@@ -79,7 +79,7 @@ Statement * RepeatStatementSemanticAction(Expression * count, StatementList * bo
 StatementList * SingletonStatementListSemanticAction(Statement * statement);
 StatementList * StatementListSemanticAction(StatementList * list, Statement * statement);
 
-Method * MethodSemanticAction(char * name, ParameterList * parameters, StatementList * body);
+Method * MethodSemanticAction(char * name, ParameterList * parameters, StatementList * body, Position position);
 
 /** Availability. */
 

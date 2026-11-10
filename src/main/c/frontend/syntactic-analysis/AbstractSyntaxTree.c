@@ -118,6 +118,7 @@ void destroyParameter(Parameter * parameter) {
 	if (parameter != NULL) {
 		free(parameter->name);
 		free(parameter->type);
+		destroyExpression(parameter->defaultValue);
 		free(parameter);
 	}
 }

@@ -1,0 +1,2 @@
+method Lectura() { session 1h; }
+method Lectura() { session 2h; }

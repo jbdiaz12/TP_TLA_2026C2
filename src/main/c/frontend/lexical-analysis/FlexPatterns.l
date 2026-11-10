@@ -94,6 +94,7 @@ whitespace				[[:space:]]+
 "and"								{ return KeywordLexemeAction(AND); }
 "availability"						{ return KeywordLexemeAction(AVAILABILITY); }
 "constraints"						{ return KeywordLexemeAction(CONSTRAINTS); }
+"default"							{ return KeywordLexemeAction(DEFAULT); }
 "for"								{ return KeywordLexemeAction(FOR); }
 "goal"								{ return KeywordLexemeAction(GOAL); }
 "in"								{ return KeywordLexemeAction(IN); }
