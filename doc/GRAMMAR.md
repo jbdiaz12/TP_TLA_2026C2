@@ -10,10 +10,12 @@ Definición formal de `G = ⟨Σ, N, Π, S⟩`. El analizador léxico
 ### 1.1 Palabras reservadas
 
 ```
-after   and     availability  constraints  for   goal    in  method
-not     or      otherwise     pause        plan  repeat
-rules   scale   session       topic        when
+after   and     availability  constraints  default  for     goal  in
+include method  not           or           otherwise         pause plan
+repeat  rules   scale         session      topic    when
 ```
+
+`include` no llega nunca al analizador sintáctico: lo resuelve el léxico (ver §1.5).
 
 
 ### 1.2 Literales
@@ -56,6 +58,22 @@ rango no resulte indistinguible de una resta.
 Espacios, tabulaciones y saltos de línea; comentarios de línea (`//`) y de bloque
 (`/* … */`, mediante el contexto exclusivo `MULTILINE_COMMENT`). Un comentario de
 bloque sin cerrar constituye un error.
+
+### 1.5 Inclusión de archivos
+
+Como `#include` en C, la directiva copia el contenido de otro archivo en el lugar
+donde aparece. La resuelve el analizador léxico, apilando un nuevo buffer de
+entrada, así que el analizador sintáctico recibe directamente los tokens del
+archivo incluido y la gramática no cambia. No lleva `;`.
+
+| Forma | Busca |
+| :---- | :---- |
+| `include <metodos>` | `metodos.stujfy` en la carpeta de la librería estándar (`src/main/stujfy/lib`, o la que indique `STUJFY_LIBRARY_PATH`) |
+| `include "ruta.stujfy"` | El archivo, relativo a la carpeta desde la que se ejecuta el compilador |
+
+Cada archivo se incluye una sola vez, como con `#pragma once`: un segundo
+`include` del mismo archivo no tiene efecto, y dos archivos que se incluyen
+entre sí no generan un ciclo. Un archivo inexistente es un error léxico.
 
 ---
 
@@ -151,6 +169,7 @@ parameterList    → parameter
                  | parameterList COMMA parameter
 
 parameter        → IDENTIFIER COLON IDENTIFIER
+                 | IDENTIFIER COLON IDENTIFIER DEFAULT expression
 
 statementList    → statement
                  | statementList statement
@@ -161,6 +180,12 @@ statement        → SESSION expression SEMICOLON
                  | REPEAT expression OPEN_BRACE statementList CLOSE_BRACE
                  | FOR IDENTIFIER IN expression OPEN_BRACE statementList CLOSE_BRACE
 ```
+
+Un parámetro con `default` toma ese valor cuando la invocación lo omite, así que
+`Pomodoro()` y `Pomodoro(50m)` son invocaciones válidas del mismo método. El
+análisis semántico exige que los parámetros con valor por defecto sean los
+últimos, que el nombre del método empiece con mayúscula y que no se redefina un
+método de una librería incluida.
 
 ### 4.5 Disponibilidad horaria
 
@@ -274,8 +299,8 @@ bloques). Las construcciones del informe se expresan así:
 | `goal TLA due 2026-12-05 priority 80%;` | `goal TLA { due: 2026-12-05; priority: alto; }` | `30-goal-priority` |
 | Dificultad de 1 a 5 | Nivel de una `scale` declarada (`difficulty: medioAlto;`) | `11-scale`, `15-method-attribute` |
 | `estimated 4h 30m;` | `estimated: 4h30m;` (una sola `DURATION`) | `06-literals` |
-| `method pomodoro { work 25m; … }` | `method pomodoro(…) { … }` y `method: pomodoro(25m, 5m, 4);` | `12-method-repeat`, `15-method-attribute` |
-| `profile` + `use` | Un `method` declarado una vez y aplicado a varios temas | `26-reused-method` |
+| `method pomodoro { work 25m; … }` | `include <metodos>` y `method: Pomodoro(25m, 5m, 4);`, o un `method` propio | `31-include-library`, `12-method-repeat`, `15-method-attribute` |
+| `profile` + `use` | Un `method` declarado una vez (o tomado de una librería) y aplicado a varios temas | `26-reused-method`, `34-include-file` |
 | `if (…) { … } else { … }` | Bloque `rules` con `when … -> …;` y `otherwise -> …;` | `19-rules` |
 | `mon, wed, fri = 3h;` `sun = rest;` | `weekdays: 3h;` (un día sin declarar no está disponible para estudiar, sin `rest`) | `16`, `17`, `27-availability-free-day` |
 | Sesión fija en fecha y hora | `fixed: 2026-11-20, 18:00, 90m;` | `28-fixed-session` |

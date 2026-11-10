@@ -24,22 +24,18 @@ La gramática formal `G = ⟨Σ, N, Π, S⟩` está documentada en
 | :---- | :-------- | :----- |
 | Stage I: Diseño | Informe en `doc/` | Entregado |
 | Stage II: Frontend | Analizador léxico (Flex), sintáctico (Bison) y construcción del AST | Entregado |
-| Stage III: Backend | Análisis semántico y generación del cronograma (HTML + iCal) | Pendiente |
+| Stage III: Backend | Análisis semántico y generación del cronograma (HTML + iCal) | En desarrollo |
 
-En esta etapa el compilador acepta un programa si es léxica y sintácticamente
-válido y construye su AST; todavía no valida el dominio ni genera artefactos.
+Hoy el compilador analiza el programa léxica y sintácticamente, construye su AST,
+resuelve los `include` y valida las declaraciones de métodos. El resto del
+análisis semántico y la generación del cronograma están en desarrollo.
 
 ## Ejemplo
 
 ```
-scale nivel { bajo < medio < alto }
+include <metodos>
 
-method pomodoro(trabajo: duration, descanso: duration, ciclos: integer) {
-    repeat ciclos {
-        session trabajo;
-        pause descanso;
-    }
-}
+scale nivel { bajo < medio < alto }
 
 goal TLA {
     due: 2026-12-05;
@@ -55,8 +51,8 @@ availability {
 }
 
 rules {
-    when difficulty >= alto -> pomodoro(50m, 10m, 3);
-    otherwise               -> pomodoro(25m, 5m, 4);
+    when difficulty >= alto -> Pomodoro(50m, 10m, 3);
+    otherwise               -> Pomodoro();
 }
 
 plan {
@@ -68,6 +64,32 @@ plan {
 Un ejemplo con todas las construcciones está en
 [`src/test/c/accept/22-full-program.stujfy`](src/test/c/accept/22-full-program.stujfy).
 
+## Librería estándar
+
+Como en C, un programa puede incluir librerías escritas en el propio Stujfy. La
+directiva no lleva `;`:
+
+```
+include <metodos>              // librería estándar
+include "mis-metodos.stujfy"   // archivo propio, relativo a la carpeta desde la que se ejecuta el compilador
+```
+
+La librería estándar está en [`src/main/stujfy/lib`](src/main/stujfy/lib) y, por
+ahora, trae `<metodos>`:
+
+| Método | Parámetros (valor por defecto) | Qué hace |
+| :----- | :----------------------------- | :------- |
+| `Bloque` | `duracion` (`1h`) | Una sesión continua. |
+| `Pomodoro` | `trabajo` (`25m`), `descanso` (`5m`), `ciclos` (`4`) | Bloques de trabajo separados por descansos cortos. |
+| `Espaciado` | `unidad` (`30m`), `intervalos` (`[1d, 3d, 7d, 21d]`) | Una sesión y repasos a intervalos crecientes. |
+| `ActiveRecall` | `estudio` (`25m`), `evocacion` (`10m`), `rondas` (`2`) | Estudiar el material y reconstruirlo sin mirarlo. |
+
+Los argumentos van por posición, y los que se omiten al final toman su valor por
+defecto: `Pomodoro()` es el pomodoro clásico y `Pomodoro(50m)` cambia solo el
+trabajo. Un método de la librería no se puede redefinir, porque su cuerpo es lo
+que lo hace ser ese método; para estudiar de otra forma, se declara un `method`
+propio con otro nombre. Los nombres de los métodos empiezan con mayúscula.
+
 ## Casos de prueba
 
 Los programas de prueba están en `src/test/c` y se ejecutan con
@@ -77,12 +99,13 @@ ejercita una sola construcción, salvo `22-full-program`.
 | Carpeta | Contenido | ¿Lo ejecuta `test.sh`? |
 | :------ | :-------- | :--------------------- |
 | `accept/` | Programas válidos; el compilador debe aceptarlos. | Sí |
-| `reject/` | Programas léxica o sintácticamente inválidos; el compilador debe rechazarlos. | Sí |
-| `ignore/reject/` | Programas que deben rechazarse por razones semánticas (objetivo duplicado, ciclo de dependencias, carga inviable, etc.). | No |
+| `reject/` | Programas con errores léxicos, sintácticos o semánticos; el compilador debe rechazarlos. | Sí |
+| `ignore/reject/` | Programas que deben rechazarse por validaciones semánticas que todavía no están implementadas (objetivo duplicado, ciclo de dependencias, carga inviable, etc.). | No |
 
 Los casos de `ignore/reject/` son sintácticamente válidos, por lo que hoy el
-compilador los acepta (falso positivo, como prevé el enunciado para el Stage II).
-Pasarán a `reject/` cuando el backend implemente el análisis semántico.
+compilador los acepta. Pasan a `reject/` a medida que el backend implementa cada
+validación. `src/test/c/lib/` contiene archivos auxiliares que incluyen los
+tests, y no son tests en sí.
 
 Los casos de aceptación y rechazo propuestos en el informe de la Etapa 1 se
 corresponden con los siguientes programas:
@@ -115,6 +138,7 @@ detalla cómo cambió la sintaxis respecto de los ejemplos del informe.
 
 * [Estado](#estado)
 * [Ejemplo](#ejemplo)
+* [Librería estándar](#librería-estándar)
 * [Casos de prueba](#casos-de-prueba)
 * [Requirements](#requirements)
 * [Configuration](#configuration)
@@ -135,6 +159,7 @@ Set the following environment variables to control and configure the behaviour o
 | `ENVIRONMENT`         | `Local` | The active environment name. The available environments are: `Local`, `Development` and `Production`.                                                                 |
 | `LOG_IGNORED_LEXEMES` | `true`  | When `true`, logs all of the ignored lexemes found with Flex at `DEBUGGING` level. To remove those logs from the console output set it to `false`.                    |
 | `LOGGING_LEVEL`       | `ALL`   | The minimum level to log in the console output. From lower to higher, the available levels are: `ALL`, `DEBUGGING`, `INFORMATION`, `WARNING`, `ERROR` and `CRITICAL`. |
+| `STUJFY_LIBRARY_PATH` | `src/main/stujfy/lib` | The folder where `include <name>` looks for `name.stujfy`. The default value is relative to the root of the repository, where the scripts run the compiler. |
 
 _Docker Compose_ can read the variables from an `.env` file too (see `compose.yaml` file).
 
