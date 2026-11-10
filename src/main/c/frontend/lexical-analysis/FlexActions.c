@@ -7,9 +7,39 @@ static LexicalAnalyzer * _lexicalAnalyzer = NULL;
 static Logger * _logger = NULL;
 
 /** Where the last multiline comment was opened, to report it if it's never closed. */
-static int _commentColumn = 0;
-static int _commentLine = 0;
+static YYLTYPE _commentLocation;
 
+/** The folder of the standard library, where "include <name>" looks for "name.stujfy". */
+static const char * _libraryPath = NULL;
+
+/**
+ * The deepest chain of nested includes. Every file is included only once, so
+ * this limit is only reached by a really deep (and odd) chain of libraries.
+ */
+#define MAXIMUM_INCLUDE_DEPTH 16
+
+/** An included file that is being scanned, and where to resume the file that includes it. */
+typedef struct {
+	InputBuffer * inputBuffer;
+	YYLTYPE resumeLocation;
+} IncludedFile;
+
+static IncludedFile _includeStack[MAXIMUM_INCLUDE_DEPTH];
+static int _includeDepth = 0;
+
+/**
+ * Every file included so far: its canonical path, used to include it only
+ * once, and the name shown in the messages (e.g., "<metodos>"). The names
+ * live until the end of the compilation, because the locations of the AST
+ * point to them.
+ */
+typedef struct SourceFile {
+	char * path;
+	char * name;
+	struct SourceFile * next;
+} SourceFile;
+
+static SourceFile * _sourceFiles = NULL;
 
 /** Shutdown module's internal state. */
 void _shutdownFlexActionsModule() {
@@ -18,6 +48,23 @@ void _shutdownFlexActionsModule() {
 		destroyLogger(_logger);
 		_logger = NULL;
 	}
+	/**
+	 * When the compilation fails inside an included file, its buffers are
+	 * still stacked. They're popped here, because "yylex_destroy" only
+	 * deletes the buffer at the top of the stack and leaks the rest.
+	 */
+	while (0 < _includeDepth) {
+		--_includeDepth;
+		popInputBuffer(_lexicalAnalyzer);
+		destroyInputBuffer(_includeStack[_includeDepth].inputBuffer);
+	}
+	while (_sourceFiles != NULL) {
+		SourceFile * next = _sourceFiles->next;
+		free(_sourceFiles->path);
+		free(_sourceFiles->name);
+		free(_sourceFiles);
+		_sourceFiles = next;
+	}
 	_lexicalAnalyzer = NULL;
 }
 
@@ -25,15 +72,18 @@ ModuleDestructor initializeFlexActionsModule(LexicalAnalyzer * lexicalAnalyzer) 
 	_lexicalAnalyzer = lexicalAnalyzer;
 	_logger = createLogger("FlexActions");
 	_logIgnoredLexemes = getBooleanOrDefault("LOG_IGNORED_LEXEMES", _logIgnoredLexemes);
+	_libraryPath = getStringOrDefault("STUJFY_LIBRARY_PATH", "src/main/stujfy/lib");
 	return _shutdownFlexActionsModule;
 }
 
 /* PRIVATE FUNCTIONS */
 
 static char * _copyLexeme(const char * lexeme, const unsigned int length);
+static CompilationStatus _include(const char * path, char * name, const bool isLibrary, const YYLTYPE * includeLocation);
+static bool _isIncluded(const char * canonicalPath);
 static void _logTokenAction(const char * actionName, Token * token);
 static CompilationStatus _push(Token * token, const char * actionName);
-static void _reportLexicalError(const int line, const int column, const char * const format, ...);
+static void _reportLexicalError(const YYLTYPE * location, const char * const format, ...);
 static CompilationStatus _throw();
 static const char * _toContextString(const FlexContext context);
 
@@ -96,11 +146,79 @@ static CompilationStatus _push(Token * token, const char * actionName) {
 }
 
 /**
+ * Starts scanning an included file, unless it was already included before:
+ * like "#pragma once" in C, every file is included only once, which also
+ * prevents two libraries that include each other from looping forever. The
+ * name is owned by this function, which keeps it or frees it.
+ */
+static CompilationStatus _include(const char * path, char * name, const bool isLibrary, const YYLTYPE * includeLocation) {
+	char * canonicalPath = realpath(path, NULL);
+	if (canonicalPath == NULL) {
+		if (isLibrary) {
+			_reportLexicalError(includeLocation, "no existe la librería %s.", name);
+		}
+		else {
+			_reportLexicalError(includeLocation, "no se encuentra el archivo \"%s\".", name);
+		}
+		free(name);
+		return _throw();
+	}
+	if (_isIncluded(canonicalPath)) {
+		logDebugging(_logger, "The file \"%s\" is already included.", canonicalPath);
+		free(canonicalPath);
+		free(name);
+		return IN_PROGRESS;
+	}
+	InputBuffer * inputBuffer = NULL;
+	if (_includeDepth == MAXIMUM_INCLUDE_DEPTH || (inputBuffer = createInputBuffer(_lexicalAnalyzer, canonicalPath)) == NULL) {
+		_reportLexicalError(includeLocation, "no se puede incluir %s.", name);
+		free(canonicalPath);
+		free(name);
+		return _throw();
+	}
+	SourceFile * source = calloc(1, sizeof(SourceFile));
+	source->path = canonicalPath;
+	source->name = name;
+	source->next = _sourceFiles;
+	_sourceFiles = source;
+	YYLTYPE * location = (YYLTYPE *) _lexicalAnalyzer->location;
+	_includeStack[_includeDepth].inputBuffer = inputBuffer;
+	_includeStack[_includeDepth].resumeLocation = *location;
+	++_includeDepth;
+	pushInputBuffer(inputBuffer);
+	*location = (YYLTYPE) {
+		.first_line = 1,
+		.first_column = 1,
+		.last_line = 1,
+		.last_column = 1,
+		.file = source->name
+	};
+	return IN_PROGRESS;
+}
+
+/**
+ * Whether a file was already included, given its canonical path.
+ */
+static bool _isIncluded(const char * canonicalPath) {
+	for (SourceFile * source = _sourceFiles; source != NULL; source = source->next) {
+		if (strcmp(source->path, canonicalPath) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
  * Reports a lexical error to the user, in the standard error output and with
  * the location where it takes place. Unlike the logs, it's always visible.
  */
-static void _reportLexicalError(const int line, const int column, const char * const format, ...) {
-	fprintf(stderr, "Error léxico (%d:%d): ", line, column);
+static void _reportLexicalError(const YYLTYPE * location, const char * const format, ...) {
+	if (location->file != NULL) {
+		fprintf(stderr, "Error léxico en %s (%d:%d): ", location->file, location->first_line, location->first_column);
+	}
+	else {
+		fprintf(stderr, "Error léxico (%d:%d): ", location->first_line, location->first_column);
+	}
 	va_list arguments;
 	va_start(arguments, format);
 	vfprintf(stderr, format, arguments);
@@ -158,9 +276,7 @@ CompilationStatus DurationLexemeAction() {
 }
 
 CompilationStatus EnterMultilineCommentLexemeAction(FlexContext context) {
-	YYLTYPE * location = (YYLTYPE *) _lexicalAnalyzer->location;
-	_commentLine = location->first_line;
-	_commentColumn = location->first_column;
+	_commentLocation = *((YYLTYPE *) _lexicalAnalyzer->location);
 	if (_logIgnoredLexemes) {
 		Token * token = createToken(_lexicalAnalyzer, OPEN_COMMENT);
 		_logTokenAction(__FUNCTION__, token);
@@ -174,25 +290,30 @@ CompilationStatus EOFLexemeAction() {
 	CompilationStatus status = IN_PROGRESS;
 	Token * token = createToken(_lexicalAnalyzer, 0);
 	_logTokenAction(__FUNCTION__, token);
-	if (!popInputBuffer(_lexicalAnalyzer)) {
-		/**
-		 * The context is checked before the parser receives the end of the
-		 * input. Otherwise, a program that is valid up to an unclosed comment
-		 * would be accepted first, and rejected afterwards.
-		 */
-		FlexContext context = currentLexicalAnalyzerContext(_lexicalAnalyzer);
-		if (0 != context) {
-			logError(_logger, "The final context is not closed (context=%s).", _toContextString(context));
-			_reportLexicalError(_commentLine, _commentColumn, "el comentario de bloque nunca se cierra.");
-			status = _throw();
-		}
-		else {
-			/** The end of the input is located right after its last lexeme. */
-			YYLTYPE * location = (YYLTYPE *) _lexicalAnalyzer->location;
-			location->first_line = location->last_line;
-			location->first_column = location->last_column;
-			status = pushToken(_lexicalAnalyzer, token);
-		}
+	YYLTYPE * location = (YYLTYPE *) _lexicalAnalyzer->location;
+	/**
+	 * The context is checked before the parser receives the end of the input.
+	 * Otherwise, a program that is valid up to an unclosed comment would be
+	 * accepted first, and rejected afterwards. Every file must close its own
+	 * comments, so this also applies at the end of an included file.
+	 */
+	FlexContext context = currentLexicalAnalyzerContext(_lexicalAnalyzer);
+	if (0 != context) {
+		logError(_logger, "The final context is not closed (context=%s).", _toContextString(context));
+		_reportLexicalError(&_commentLocation, "el comentario de bloque nunca se cierra.");
+		status = _throw();
+	}
+	else if (popInputBuffer(_lexicalAnalyzer)) {
+		/** An included file ends, so the file that includes it resumes. */
+		--_includeDepth;
+		destroyInputBuffer(_includeStack[_includeDepth].inputBuffer);
+		*location = _includeStack[_includeDepth].resumeLocation;
+	}
+	else {
+		/** The end of the input is located right after its last lexeme. */
+		location->first_line = location->last_line;
+		location->first_column = location->last_column;
+		status = pushToken(_lexicalAnalyzer, token);
 	}
 	destroyToken(token);
 	return status;
@@ -211,6 +332,40 @@ CompilationStatus IgnoredLexemeAction() {
 		destroyToken(token);
 	}
 	return IN_PROGRESS;
+}
+
+/**
+ * Includes a file, like "#include" in C: its content is scanned right here,
+ * as if it were written in place of the directive, so the parser never sees
+ * the directive itself. A library ("include <name>") is searched for in the
+ * library folder, and any other file ("include "path"") is relative to the
+ * directory where the compiler runs.
+ */
+CompilationStatus IncludeLexemeAction(bool isLibrary) {
+	Token * token = createToken(_lexicalAnalyzer, IGNORED);
+	_logTokenAction(__FUNCTION__, token);
+	const YYLTYPE includeLocation = *((YYLTYPE *) _lexicalAnalyzer->location);
+	const char * opening = strchr(token->lexeme, isLibrary ? '<' : '"');
+	const unsigned int length = token->length - (unsigned int) (opening - token->lexeme) - 2;
+	char * target = _copyLexeme(opening + 1, length);
+	destroyToken(token);
+	CompilationStatus status;
+	if (isLibrary) {
+		char * path = concatenate(4, _libraryPath, "/", target, ".stujfy");
+		status = _include(path, concatenate(3, "<", target, ">"), true, &includeLocation);
+		free(path);
+		free(target);
+	}
+	else if (length == 0) {
+		_reportLexicalError(&includeLocation, "falta la ruta del archivo a incluir.");
+		free(target);
+		status = _throw();
+	}
+	else {
+		status = _include(target, concatenate(1, target), false, &includeLocation);
+		free(target);
+	}
+	return status;
 }
 
 CompilationStatus IntegerLexemeAction() {
@@ -236,6 +391,18 @@ CompilationStatus LeaveMultilineCommentLexemeAction() {
 		destroyToken(token);
 	}
 	return IN_PROGRESS;
+}
+
+/**
+ * An "include" that isn't followed by a library or a file, in the same line.
+ */
+CompilationStatus MalformedIncludeLexemeAction() {
+	Token * token = createToken(_lexicalAnalyzer, UNKNOWN);
+	_logTokenAction(__FUNCTION__, token);
+	destroyToken(token);
+	_reportLexicalError((YYLTYPE *) _lexicalAnalyzer->location,
+		"después de include va una librería (<nombre>) o un archivo (\"ruta\").");
+	return _throw();
 }
 
 /**
@@ -279,15 +446,15 @@ CompilationStatus UnknownLexemeAction() {
 	_logTokenAction(__FUNCTION__, token);
 	YYLTYPE * location = (YYLTYPE *) _lexicalAnalyzer->location;
 	if (token->lexeme[0] == '"') {
-		_reportLexicalError(location->first_line, location->first_column,
+		_reportLexicalError(location,
 			"la cadena no se cierra antes del final de la línea.");
 	}
 	else if ((unsigned char) token->lexeme[0] >= 0x80) {
-		_reportLexicalError(location->first_line, location->first_column,
+		_reportLexicalError(location,
 			"solo se admiten tildes y eñes dentro de una cadena entre comillas.");
 	}
 	else {
-		_reportLexicalError(location->first_line, location->first_column,
+		_reportLexicalError(location,
 			"no se reconoce el símbolo '%s'.", token->lexeme);
 	}
 	pushToken(_lexicalAnalyzer, token);

@@ -48,9 +48,13 @@ static const char * _compilationStatusAsString(const CompilationStatus compilati
 /* PUBLIC FUNCTIONS */
 
 InputBuffer * createInputBuffer(LexicalAnalyzer * lexicalAnalyzer, const char * path) {
+	FILE * file = fopen(path, "r");
+	if (file == NULL) {
+		return NULL;
+	}
 	InputBuffer * inputBuffer = (InputBuffer *) calloc(1, sizeof(InputBuffer));
 	inputBuffer->bufferSizeInBytes = YY_BUF_SIZE;
-	inputBuffer->file = fopen(path, "r");
+	inputBuffer->file = file;
 	inputBuffer->lexicalAnalyzer = lexicalAnalyzer;
 	inputBuffer->buffer = yy_create_buffer(inputBuffer->file, inputBuffer->bufferSizeInBytes, lexicalAnalyzer->scanner);
 	return inputBuffer;

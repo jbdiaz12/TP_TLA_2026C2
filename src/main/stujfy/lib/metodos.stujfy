@@ -1,0 +1,52 @@
+/*
+ * Librería estándar de métodos de estudio de Stujfy.
+ *
+ * Se incluye con:
+ *
+ *     include <metodos>
+ *
+ * Los métodos se personalizan con sus argumentos, y cada parámetro tiene un
+ * valor por defecto: Pomodoro() es el pomodoro clásico, y Pomodoro(50m) cambia
+ * solo la duración del trabajo. No se pueden redefinir, porque su cuerpo es lo
+ * que los hace ser ese método. Para estudiar de otra forma, se declara un
+ * método propio con otro nombre.
+ *
+ * El planificador repite el método hasta cubrir las horas estimadas del tema.
+ * Las pausas no cuentan como estudio; los repasos, sí.
+ */
+
+// Una sesión continua.
+method Bloque(duracion: duration default 1h) {
+    session duracion;
+}
+
+// Técnica Pomodoro: bloques de trabajo separados por descansos cortos.
+method Pomodoro(trabajo: duration default 25m,
+                descanso: duration default 5m,
+                ciclos: integer default 4) {
+    repeat ciclos {
+        session trabajo;
+        pause descanso;
+    }
+}
+
+// Repetición espaciada: una sesión y repasos a intervalos crecientes, contados
+// desde la primera sesión.
+method Espaciado(unidad: duration default 30m,
+                 intervalos: list default [1d, 3d, 7d, 21d]) {
+    session unidad;
+    for intervalo in intervalos {
+        after intervalo session unidad;
+    }
+}
+
+// Active recall: estudiar el material y después reconstruirlo sin mirarlo.
+method ActiveRecall(estudio: duration default 25m,
+                    evocacion: duration default 10m,
+                    rondas: integer default 2) {
+    repeat rondas {
+        session estudio;
+        session evocacion;
+        pause 5m;
+    }
+}

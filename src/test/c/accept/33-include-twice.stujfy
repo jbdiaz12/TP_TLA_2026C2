@@ -1,0 +1,3 @@
+include <metodos>
+include <metodos>
+topic Automatas { method: Espaciado(); }

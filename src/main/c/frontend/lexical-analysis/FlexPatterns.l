@@ -42,9 +42,11 @@ extern CompilationStatus EnterMultilineCommentLexemeAction(FlexContext context);
 extern CompilationStatus EOFLexemeAction();
 extern CompilationStatus IdentifierLexemeAction();
 extern CompilationStatus IgnoredLexemeAction();
+extern CompilationStatus IncludeLexemeAction(bool isLibrary);
 extern CompilationStatus IntegerLexemeAction();
 extern CompilationStatus KeywordLexemeAction(TokenLabel label);
 extern CompilationStatus LeaveMultilineCommentLexemeAction();
+extern CompilationStatus MalformedIncludeLexemeAction();
 extern CompilationStatus OperatorLexemeAction(TokenLabel label);
 extern CompilationStatus StringLexemeAction();
 extern CompilationStatus TimeLexemeAction();
@@ -89,6 +91,10 @@ whitespace				[[:space:]]+
 <MULTILINE_COMMENT>.				{ return IgnoredLexemeAction(); }
 
 "//".*								{ return IgnoredLexemeAction(); }
+
+"include"[ \t]*"<"{identifier}">"	{ return IncludeLexemeAction(true); }
+"include"[ \t]*{string}				{ return IncludeLexemeAction(false); }
+"include"							{ return MalformedIncludeLexemeAction(); }
 
 "after"								{ return KeywordLexemeAction(AFTER); }
 "and"								{ return KeywordLexemeAction(AND); }

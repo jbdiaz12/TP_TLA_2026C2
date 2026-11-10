@@ -1,0 +1,4 @@
+// Librería propia que usan los tests de include con ruta.
+method Repaso(duracion: duration default 1h) {
+    session duracion;
+}

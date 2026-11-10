@@ -1,0 +1,2 @@
+include "src/test/c/lib/propios.stujfy"
+topic Automatas { method: Repaso(); }
