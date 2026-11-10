@@ -3,14 +3,19 @@
 #include "../../support/type/TokenLabel.h"
 #include "AbstractSyntaxTree.h"
 #include "BisonActions.h"
+#include <stdio.h>
 
 /**
- * The error reporting function for Bison parser.
+ * The error reporting function for Bison parser. Syntax errors are reported
+ * by "yyreport_syntax_error" (see the epilogue), so this function only
+ * receives the remaining failures, such as running out of memory.
  *
  * @see https://www.gnu.org/software/bison/manual/html_node/Error-Reporting-Function.html
  * @see https://www.gnu.org/software/bison/manual/html_node/Tracking-Locations.html
  */
-void yyerror(const YYLTYPE * location, const char * message) {}
+void yyerror(const YYLTYPE * location, const char * message) {
+	fprintf(stderr, "Error sintáctico (%d:%d): %s.\n", location->first_line, location->first_column, message);
+}
 
 /**
  * @see https://www.gnu.org/software/bison/manual/html_node/Location-Default-Action.html
@@ -34,7 +39,7 @@ void yyerror(const YYLTYPE * location, const char * message) {}
 %define api.pure full
 %define api.push-pull push
 %define api.value.union.name SemanticValue
-%define parse.error detailed
+%define parse.error custom
 %locations
 
 %union {
@@ -117,34 +122,39 @@ void yyerror(const YYLTYPE * location, const char * message) {}
 %destructor { destroySlotList($$); } <slotList>
 %destructor { destroyTopic($$); } <topic>
 
+/**
+ * The aliases are the names that a syntax error shows to the user (e.g.,
+ * "se esperaba una fecha"), so they're written in the language of the user.
+ */
+
 /** Terminals: literals. */
-%token <integer> DATE
-%token <integer> DURATION
-%token <integer> INTEGER
-%token <integer> TIME
-%token <string> IDENTIFIER
-%token <string> STRING
+%token <integer> DATE "una fecha"
+%token <integer> DURATION "una duración"
+%token <integer> INTEGER "un entero"
+%token <integer> TIME "una hora"
+%token <string> IDENTIFIER "un identificador"
+%token <string> STRING "una cadena"
 
 /** Terminals: reserved words. */
-%token <token> AFTER
-%token <token> AND
-%token <token> AVAILABILITY
-%token <token> CONSTRAINTS
-%token <token> FOR
-%token <token> GOAL
-%token <token> IN
-%token <token> METHOD
-%token <token> NOT
-%token <token> OR
-%token <token> OTHERWISE
-%token <token> PAUSE
-%token <token> PLAN
-%token <token> REPEAT
-%token <token> RULES
-%token <token> SCALE
-%token <token> SESSION
-%token <token> TOPIC
-%token <token> WHEN
+%token <token> AFTER "after"
+%token <token> AND "and"
+%token <token> AVAILABILITY "availability"
+%token <token> CONSTRAINTS "constraints"
+%token <token> FOR "for"
+%token <token> GOAL "goal"
+%token <token> IN "in"
+%token <token> METHOD "method"
+%token <token> NOT "not"
+%token <token> OR "or"
+%token <token> OTHERWISE "otherwise"
+%token <token> PAUSE "pause"
+%token <token> PLAN "plan"
+%token <token> REPEAT "repeat"
+%token <token> RULES "rules"
+%token <token> SCALE "scale"
+%token <token> SESSION "session"
+%token <token> TOPIC "topic"
+%token <token> WHEN "when"
 
 /** Terminals: operators and punctuation. */
 %token <token> ADD "+"
@@ -391,3 +401,66 @@ expressionList: expression																{ $$ = SingletonExpressionListSemantic
 	;
 
 %%
+
+/** The longest list of expected symbols that is still useful to the user. */
+#define MAXIMUM_EXPECTED_SYMBOLS 5
+
+/**
+ * Prints the name of a symbol. Literals and identifiers are described (e.g.,
+ * "una fecha"), while reserved words and punctuation are quoted, so that a
+ * lone ";" can't be confused with the punctuation of the message itself.
+ */
+static void _printSymbol(const yysymbol_kind_t symbol) {
+	switch (symbol) {
+		case YYSYMBOL_DATE:
+		case YYSYMBOL_DURATION:
+		case YYSYMBOL_IDENTIFIER:
+		case YYSYMBOL_INTEGER:
+		case YYSYMBOL_STRING:
+		case YYSYMBOL_TIME:
+			fprintf(stderr, "%s", yysymbol_name(symbol));
+			break;
+		default:
+			fprintf(stderr, "'%s'", yysymbol_name(symbol));
+			break;
+	}
+}
+
+/**
+ * Reports a syntax error with its location, the symbol found and, when there
+ * are just a few, the symbols that were expected instead. An unknown symbol
+ * or an exception was already reported by the lexical-analyzer, so they're
+ * not reported twice.
+ *
+ * @see https://www.gnu.org/software/bison/manual/html_node/Syntax-Error-Reporting-Function.html
+ */
+static int yyreport_syntax_error(const yypcontext_t * context) {
+	const yysymbol_kind_t found = yypcontext_token(context);
+	if (found == YYSYMBOL_UNKNOWN || found == YYSYMBOL_EXCEPTION) {
+		return 0;
+	}
+	const YYLTYPE * location = yypcontext_location(context);
+	fprintf(stderr, "Error sintáctico (%d:%d): ", location->first_line, location->first_column);
+	if (found == YYSYMBOL_YYEOF) {
+		fprintf(stderr, "el programa termina antes de tiempo");
+	}
+	else if (found != YYSYMBOL_YYEMPTY) {
+		fprintf(stderr, "no se esperaba ");
+		_printSymbol(found);
+	}
+	else {
+		fprintf(stderr, "el programa no respeta la gramática");
+	}
+	yysymbol_kind_t expected[MAXIMUM_EXPECTED_SYMBOLS];
+	const int total = yypcontext_expected_tokens(context, NULL, 0);
+	if (0 < total && total <= MAXIMUM_EXPECTED_SYMBOLS) {
+		yypcontext_expected_tokens(context, expected, MAXIMUM_EXPECTED_SYMBOLS);
+		fprintf(stderr, "; se esperaba ");
+		for (int k = 0; k < total; ++k) {
+			fprintf(stderr, "%s", (k == 0) ? "" : (k == total - 1) ? " o " : ", ");
+			_printSymbol(expected[k]);
+		}
+	}
+	fprintf(stderr, ".\n");
+	return 0;
+}

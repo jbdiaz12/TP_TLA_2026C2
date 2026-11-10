@@ -58,7 +58,10 @@ InputBuffer * createInputBuffer(LexicalAnalyzer * lexicalAnalyzer, const char * 
 
 LexicalAnalyzer * createLexicalAnalyzer() {
 	LexicalAnalyzer * lexicalAnalyzer = (LexicalAnalyzer *) calloc(1, sizeof(LexicalAnalyzer));
-	lexicalAnalyzer->location = calloc(1, sizeof(YYLTYPE));
+	YYLTYPE * location = (YYLTYPE *) calloc(1, sizeof(YYLTYPE));
+	location->first_line = location->last_line = 1;
+	location->first_column = location->last_column = 1;
+	lexicalAnalyzer->location = location;
 	lexicalAnalyzer->logger = createLogger("LexicalAnalyzer");
 	yylex_init(&lexicalAnalyzer->scanner);
 	lexicalAnalyzer->parser = yypstate_new();

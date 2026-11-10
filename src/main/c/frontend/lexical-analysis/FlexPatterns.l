@@ -11,8 +11,25 @@
 %{
 
 /**
+ * Updates the location of every lexeme before its action runs, so both
+ * analyzers can report where an error takes place. The column counts
+ * characters instead of bytes: the continuation bytes of a multi-byte UTF-8
+ * character don't advance it.
+ *
  * @see https://westes.github.io/flex/manual/Misc-Macros.html
  */
+#define YY_USER_ACTION											\
+	yylloc->first_line = yylloc->last_line;						\
+	yylloc->first_column = yylloc->last_column;					\
+	for (int k = 0; k < yyleng; ++k) {							\
+		if (yytext[k] == '\n') {								\
+			++yylloc->last_line;								\
+			yylloc->last_column = 1;							\
+		}														\
+		else if ((yytext[k] & 0xC0) != 0x80) {					\
+			++yylloc->last_column;								\
+		}														\
+	}
 
 
 /**

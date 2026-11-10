@@ -6,6 +6,10 @@ static bool _logIgnoredLexemes = true;
 static LexicalAnalyzer * _lexicalAnalyzer = NULL;
 static Logger * _logger = NULL;
 
+/** Where the last multiline comment was opened, to report it if it's never closed. */
+static int _commentColumn = 0;
+static int _commentLine = 0;
+
 
 /** Shutdown module's internal state. */
 void _shutdownFlexActionsModule() {
@@ -29,6 +33,7 @@ ModuleDestructor initializeFlexActionsModule(LexicalAnalyzer * lexicalAnalyzer) 
 static char * _copyLexeme(const char * lexeme, const unsigned int length);
 static void _logTokenAction(const char * actionName, Token * token);
 static CompilationStatus _push(Token * token, const char * actionName);
+static void _reportLexicalError(const int line, const int column, const char * const format, ...);
 static CompilationStatus _throw();
 static const char * _toContextString(const FlexContext context);
 
@@ -91,6 +96,19 @@ static CompilationStatus _push(Token * token, const char * actionName) {
 }
 
 /**
+ * Reports a lexical error to the user, in the standard error output and with
+ * the location where it takes place. Unlike the logs, it's always visible.
+ */
+static void _reportLexicalError(const int line, const int column, const char * const format, ...) {
+	fprintf(stderr, "Error léxico (%d:%d): ", line, column);
+	va_list arguments;
+	va_start(arguments, format);
+	vfprintf(stderr, format, arguments);
+	va_end(arguments);
+	fprintf(stderr, "\n");
+}
+
+/**
  * Instructs the parser to halt execution unrecoverably.
  */
 CompilationStatus _throw() {
@@ -140,6 +158,9 @@ CompilationStatus DurationLexemeAction() {
 }
 
 CompilationStatus EnterMultilineCommentLexemeAction(FlexContext context) {
+	YYLTYPE * location = (YYLTYPE *) _lexicalAnalyzer->location;
+	_commentLine = location->first_line;
+	_commentColumn = location->first_column;
 	if (_logIgnoredLexemes) {
 		Token * token = createToken(_lexicalAnalyzer, OPEN_COMMENT);
 		_logTokenAction(__FUNCTION__, token);
@@ -154,11 +175,23 @@ CompilationStatus EOFLexemeAction() {
 	Token * token = createToken(_lexicalAnalyzer, 0);
 	_logTokenAction(__FUNCTION__, token);
 	if (!popInputBuffer(_lexicalAnalyzer)) {
-		status = pushToken(_lexicalAnalyzer, token);
+		/**
+		 * The context is checked before the parser receives the end of the
+		 * input. Otherwise, a program that is valid up to an unclosed comment
+		 * would be accepted first, and rejected afterwards.
+		 */
 		FlexContext context = currentLexicalAnalyzerContext(_lexicalAnalyzer);
 		if (0 != context) {
 			logError(_logger, "The final context is not closed (context=%s).", _toContextString(context));
+			_reportLexicalError(_commentLine, _commentColumn, "el comentario de bloque nunca se cierra.");
 			status = _throw();
+		}
+		else {
+			/** The end of the input is located right after its last lexeme. */
+			YYLTYPE * location = (YYLTYPE *) _lexicalAnalyzer->location;
+			location->first_line = location->last_line;
+			location->first_column = location->last_column;
+			status = pushToken(_lexicalAnalyzer, token);
 		}
 	}
 	destroyToken(token);
@@ -235,9 +268,28 @@ CompilationStatus TimeLexemeAction() {
 	return _push(token, __FUNCTION__);
 }
 
+/**
+ * A lone quote means that a string literal reaches the end of its line
+ * without being closed, and a byte outside the ASCII range is the first byte
+ * of a character like "á" or "ñ", which identifiers don't admit. Both cases
+ * get a message of their own, because the lexeme alone doesn't explain them.
+ */
 CompilationStatus UnknownLexemeAction() {
 	Token * token = createToken(_lexicalAnalyzer, UNKNOWN);
 	_logTokenAction(__FUNCTION__, token);
+	YYLTYPE * location = (YYLTYPE *) _lexicalAnalyzer->location;
+	if (token->lexeme[0] == '"') {
+		_reportLexicalError(location->first_line, location->first_column,
+			"la cadena no se cierra antes del final de la línea.");
+	}
+	else if ((unsigned char) token->lexeme[0] >= 0x80) {
+		_reportLexicalError(location->first_line, location->first_column,
+			"solo se admiten tildes y eñes dentro de una cadena entre comillas.");
+	}
+	else {
+		_reportLexicalError(location->first_line, location->first_column,
+			"no se reconoce el símbolo '%s'.", token->lexeme);
+	}
 	pushToken(_lexicalAnalyzer, token);
 	destroyToken(token);
 	return FAILED;
