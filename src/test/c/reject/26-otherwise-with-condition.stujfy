@@ -1,1 +1,1 @@
-rules { otherwise difficulty >= alto -> pomodoro(25m, 5m, 4); }
+rules { otherwise difficulty >= alto -> Pomodoro(25m, 5m, 4); }

@@ -1,1 +1,1 @@
-method pomodoro(trabajo: duration);
+method Pomodoro(trabajo: duration);

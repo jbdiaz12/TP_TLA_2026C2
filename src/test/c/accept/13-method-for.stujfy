@@ -1,4 +1,4 @@
-method espaciado(unidad: duration, intervalos: list) {
+method Espaciado(unidad: duration, intervalos: list) {
     session unidad;
     for i in intervalos {
         after i session unidad;

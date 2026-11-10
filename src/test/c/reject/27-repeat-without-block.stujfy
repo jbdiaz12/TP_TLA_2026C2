@@ -1,1 +1,1 @@
-method simple() { repeat 3 session 25m; }
+method Simple() { repeat 3 session 25m; }

@@ -1,1 +1,1 @@
-method espaciado(intervalos: list) { for i intervalos { session 30m; } }
+method Espaciado(intervalos: list) { for i intervalos { session 30m; } }
