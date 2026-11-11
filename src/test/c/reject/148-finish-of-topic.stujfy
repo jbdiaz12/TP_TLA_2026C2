@@ -1,0 +1,5 @@
+// El tema A tiene que terminar el 2026-09-02, pero necesita 3 días.
+availability { every: 1h; }
+goal TLA { due: 2026-09-30; topic A { estimated: 3h; } topic B { estimated: 1h; } }
+constraints { finish(A) <= 2026-09-02; }
+plan { from: 2026-09-01; }

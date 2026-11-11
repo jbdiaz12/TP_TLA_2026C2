@@ -20,13 +20,54 @@ ModuleDestructor initializePlannerModule() {
 
 /* PRIVATE FUNCTIONS */
 
+static int _dueDay(const Symbol * goal);
+static bool _evaluateDate(const Expression * expression, const Symbol * goal, const SymbolTable * table, int * minutes);
 static const Attribute * _findAttribute(const MemberList * members, const char * name);
 static const Declaration * _findDeclaration(const Program * program, const DeclarationType type);
+static int _floorDivision(const int dividend, const int divisor);
+static bool _isWithin(const Symbol * topic, const Symbol * subject);
 static void _logSchedule(const Schedule * schedule);
 static void _logWork(const Work * work);
+static void _printSummary(const Schedule * schedule, const Work * works, const int count, const Urgency * urgencies);
+static void _readDeadlines(const Program * program, const SymbolTable * table, const Work * works, const int count, Urgency * urgencies);
 static void _readLimits(const Program * program, Settings * settings);
 static Settings _readSettings(const Program * program, const Urgency * urgencies, const int count, int * dayStart);
 static Urgency * _readUrgencies(const SymbolTable * table, const Work * works, const int count);
+
+/** The due date of a goal, as a day number. */
+static int _dueDay(const Symbol * goal) {
+	const Attribute * due = _findAttribute(goal->goal->members, "due");
+	return toDayNumber(due->values->expression->factor->constant->date);
+}
+
+/**
+ * Computes a date that the analysis accepts in a constraint (a date, or the
+ * deadline of a goal, moved by constant durations), as an absolute time in
+ * minutes. Inside the constraint, "goal" is the goal being constrained.
+ */
+static bool _evaluateDate(const Expression * expression, const Symbol * goal, const SymbolTable * table, int * minutes) {
+	if (expression->type == FACTOR_EXPRESSION) {
+		const Factor * factor = expression->factor;
+		if (factor->type == PARENTHESIZED_FACTOR) {
+			return _evaluateDate(factor->expression, goal, table, minutes);
+		}
+		if (factor->type == CONSTANT_FACTOR) {
+			*minutes = toDayNumber(factor->constant->date) * MINUTES_PER_DAY;
+			return true;
+		}
+		const char * subject = factor->arguments->expression->factor->variable;
+		const Symbol * target = (strcmp(subject, "goal") == 0) ? goal : findSymbol(table, GOAL_SYMBOL, subject);
+		*minutes = _dueDay(target) * MINUTES_PER_DAY;
+		return true;
+	}
+	int base = 0;
+	int shift = 0;
+	if (!_evaluateDate(expression->leftExpression, goal, table, &base) || !evaluateConstant(expression->rightExpression, &shift)) {
+		return false;
+	}
+	*minutes = (expression->type == ARITHMETIC_ADD) ? (base + shift) : (base - shift);
+	return true;
+}
 
 static const Attribute * _findAttribute(const MemberList * members, const char * name) {
 	for (const MemberList * node = members; node != NULL; node = node->next) {
@@ -44,6 +85,22 @@ static const Declaration * _findDeclaration(const Program * program, const Decla
 		}
 	}
 	return NULL;
+}
+
+/** A division that rounds towards minus infinity, to turn negative times into days. */
+static int _floorDivision(const int dividend, const int divisor) {
+	const int quotient = dividend / divisor;
+	return (dividend % divisor != 0 && dividend < 0) ? (quotient - 1) : quotient;
+}
+
+/** Whether a topic is the subject of a constraint, or is nested inside it. */
+static bool _isWithin(const Symbol * topic, const Symbol * subject) {
+	for (const Symbol * current = topic; current != NULL; current = current->parent) {
+		if (current == subject) {
+			return true;
+		}
+	}
+	return false;
 }
 
 /**
@@ -73,6 +130,110 @@ static void _logWork(const Work * work) {
 		const Block * block = &work->blocks[k];
 		logDebugging(_logger, "  block: repetition=%d, offset=%d, length=%d, study=%d, steps=%d",
 			block->repetition, block->offset, block->length, block->study, block->stepCount);
+	}
+}
+
+/**
+ * Prints a summary of the schedule in the standard output: the whole plan,
+ * and when each topic is studied.
+ */
+static void _printSummary(const Schedule * schedule, const Work * works, const int count, const Urgency * urgencies) {
+	int sessions = 0;
+	int study = 0;
+	for (int e = 0; e < schedule->count; ++e) {
+		if (schedule->entries[e].isSession) {
+			++sessions;
+			study += schedule->entries[e].duration;
+		}
+	}
+	if (sessions == 0) {
+		printf("La agenda no tiene sesiones de estudio.\n");
+		return;
+	}
+	char first[11];
+	char last[11];
+	char studyText[16];
+	formatDate(toDate(schedule->entries[0].day), first);
+	formatDate(toDate(schedule->entries[schedule->count - 1].day), last);
+	formatDuration(study, studyText);
+	printf("Agenda del %s al %s: %d sesiones, %s de estudio.\n", first, last, sessions, studyText);
+	int width = 0;
+	for (int k = 0; k < count; ++k) {
+		const int length = (int) strlen(works[k].topic->name);
+		if (width < length) {
+			width = length;
+		}
+	}
+	for (int k = 0; k < count; ++k) {
+		int topicSessions = 0;
+		int topicStudy = 0;
+		int firstDay = 0;
+		int lastDay = 0;
+		for (int e = 0; e < schedule->count; ++e) {
+			const Entry * entry = &schedule->entries[e];
+			if (entry->topic != works[k].topic || !entry->isSession) {
+				continue;
+			}
+			if (topicSessions++ == 0) {
+				firstDay = entry->day;
+			}
+			lastDay = entry->day;
+			topicStudy += entry->duration;
+		}
+		if (topicSessions == 0) {
+			continue;
+		}
+		char deadline[11];
+		formatDate(toDate(firstDay), first);
+		formatDate(toDate(lastDay), last);
+		formatDate(toDate(urgencies[k].deadline), deadline);
+		formatDuration(topicStudy, studyText);
+		printf("  %-*s  %3d sesiones (%s), del %s al %s; límite: %s.\n",
+			width, works[k].topic->name, topicSessions, studyText, first, last, deadline);
+	}
+}
+
+/**
+ * Moves ahead the deadlines with the constraints "finish(subject) <= date".
+ * The subject is every goal ("goal"), every topic ("topic"), or a named goal
+ * or topic; inside the date, "goal" is the goal of each constrained topic. A
+ * topic can be studied until the day of the date ("<=") or the day before it
+ * ("<"), and keeps the tightest deadline.
+ */
+static void _readDeadlines(const Program * program, const SymbolTable * table, const Work * works, const int count, Urgency * urgencies) {
+	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
+		if (node->declaration->type != CONSTRAINTS_DECLARATION) {
+			continue;
+		}
+		for (const ConstraintList * item = node->declaration->constraints; item != NULL; item = item->next) {
+			const Expression * constraint = item->constraint;
+			const Factor * function = constraint->leftExpression->factor;
+			if (strcmp(function->function, "finish") != 0) {
+				continue;
+			}
+			const char * name = function->arguments->expression->factor->variable;
+			const bool isEvery = (strcmp(name, "goal") == 0 || strcmp(name, "topic") == 0);
+			const Symbol * subject = isEvery ? NULL : findSymbol(table, GOAL_SYMBOL, name);
+			for (int k = 0; k < count; ++k) {
+				const Symbol * goal = works[k].topic->owner;
+				if (!isEvery && subject != goal && !_isWithin(works[k].topic, subject)) {
+					continue;
+				}
+				int minutes = 0;
+				if (!_evaluateDate(constraint->rightExpression, goal, table, &minutes)) {
+					continue;
+				}
+				if (constraint->type == COMPARE_LESS) {
+					--minutes;
+				}
+				const int deadline = _floorDivision(minutes, MINUTES_PER_DAY);
+				if (deadline < urgencies[k].deadline) {
+					urgencies[k].deadline = deadline;
+					urgencies[k].isConstrained = true;
+					urgencies[k].constraint = constraint->position;
+				}
+			}
+		}
 	}
 }
 
@@ -162,9 +323,8 @@ static Urgency * _readUrgencies(const SymbolTable * table, const Work * works, c
 	Urgency * urgencies = calloc((count == 0) ? 1 : count, sizeof(Urgency));
 	for (int k = 0; k < count; ++k) {
 		const Symbol * goal = works[k].topic->owner;
-		const Attribute * due = _findAttribute(goal->goal->members, "due");
 		const Attribute * priority = _findAttribute(goal->goal->members, "priority");
-		urgencies[k].deadline = toDayNumber(due->values->expression->factor->constant->date);
+		urgencies[k].deadline = _dueDay(goal);
 		urgencies[k].priority = -1;
 		if (priority != NULL) {
 			const Symbol * level = findSymbol(table, LEVEL_SYMBOL, priority->values->expression->factor->variable);
@@ -190,11 +350,15 @@ CompilationStatus executePlanning(const Program * program, const SymbolTable * t
 	}
 	if (planningErrorCount() == 0) {
 		Urgency * urgencies = _readUrgencies(table, works, count);
+		_readDeadlines(program, table, works, count, urgencies);
 		int dayStart = DEFAULT_DAY_START;
 		const Settings settings = _readSettings(program, urgencies, count, &dayStart);
 		WeeklyAvailability * availability = createWeeklyAvailability(_findDeclaration(program, AVAILABILITY_DECLARATION)->availability, dayStart);
 		Schedule * schedule = assignWorks(table, works, count, urgencies, availability, &settings);
 		_logSchedule(schedule);
+		if (planningErrorCount() == 0) {
+			_printSummary(schedule, works, count, urgencies);
+		}
 		destroySchedule(schedule);
 		destroyWeeklyAvailability(availability);
 		free(urgencies);

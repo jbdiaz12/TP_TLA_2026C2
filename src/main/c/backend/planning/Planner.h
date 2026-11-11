@@ -12,6 +12,8 @@
 #include "WeeklyAvailability.h"
 #include "PlanningError.h"
 #include "Work.h"
+#include <stdio.h>
+#include <string.h>
 
 /** Initialize module's internal state. */
 ModuleDestructor initializePlannerModule();

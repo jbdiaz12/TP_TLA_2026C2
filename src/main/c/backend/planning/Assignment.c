@@ -2,7 +2,6 @@
 
 /* MODULE INTERNAL STATE */
 
-#define MINUTES_PER_DAY (24 * 60)
 #define UNPLACED -1
 
 /** How much of a work is already placed. Times are absolute: day * 1440 + minutes. */
@@ -403,9 +402,17 @@ Schedule * assignWorks(const SymbolTable * table, const Work * works, const int 
 		char limitText[11];
 		formatDuration(missing, missingText);
 		formatDate(toDate(limit), limitText);
-		reportPlanningError(works[k].topic->position,
-			"no alcanza el tiempo para el tema '%s': le faltan %s de estudio para terminarlo antes del %s.",
-			works[k].topic->name, missingText, limitText);
+		const char * verb = (missing == 1 || missing == 60) ? "falta" : "faltan";
+		if (urgencies[k].isConstrained && urgencies[k].deadline <= settings->lastDay) {
+			reportPlanningError(works[k].topic->position,
+				"no alcanza el tiempo para el tema '%s': le %s %s de estudio para terminarlo a más tardar el %s, como pide la restricción %s.",
+				works[k].topic->name, verb, missingText, limitText, describePosition(urgencies[k].constraint));
+		}
+		else {
+			reportPlanningError(works[k].topic->position,
+				"no alcanza el tiempo para el tema '%s': le %s %s de estudio para terminarlo a más tardar el %s.",
+				works[k].topic->name, verb, missingText, limitText);
+		}
 	}
 	for (int k = 0; k < count; ++k) {
 		free(progress[k].starts);

@@ -13,6 +13,9 @@
 /** The days of the week, from monday (as in the ISO 8601 standard). */
 #define DAYS_PER_WEEK 7
 
+/** The minutes of a day, to turn a day number and a time into an absolute time. */
+#define MINUTES_PER_DAY (24 * 60)
+
 /** Converts a date (yyyymmdd) into its day number. */
 int toDayNumber(const int date);
 

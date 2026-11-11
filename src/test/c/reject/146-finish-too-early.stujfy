@@ -1,0 +1,5 @@
+// La restricción deja solo 3 días para 5 horas de estudio.
+availability { every: 1h; }
+goal TLA { due: 2026-09-30; topic A { estimated: 5h; } }
+constraints { finish(goal) <= deadline(goal) - 27d; }
+plan { from: 2026-09-01; }

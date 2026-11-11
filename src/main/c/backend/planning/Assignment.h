@@ -1,6 +1,7 @@
 #ifndef ASSIGNMENT_HEADER
 #define ASSIGNMENT_HEADER
 
+#include "../semantic-analysis/SemanticError.h"
 #include "../semantic-analysis/SymbolTable.h"
 #include "Calendar.h"
 #include "PlanningError.h"
@@ -33,12 +34,17 @@ typedef struct {
 } Settings;
 
 /**
- * The deadline and the priority of every work: the due date of its goal (as
- * a day number), and the rank of the priority of its goal, or -1 without one.
+ * The deadline and the priority of every work: the last day (as a day
+ * number) when it can be studied, and the rank of the priority of its goal,
+ * or -1 without one. The deadline is the due date of its goal, unless a
+ * constraint ("finish(goal) <= deadline(goal) - 7d") moves it ahead.
  */
 typedef struct {
 	int deadline;
 	int priority;
+	/** Whether a constraint sets the deadline, and where it's written. */
+	bool isConstrained;
+	Position constraint;
 } Urgency;
 
 /**

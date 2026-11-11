@@ -1,0 +1,5 @@
+// Con '<' el 2026-09-03 ya no cuenta: quedan 2 días para 3 horas.
+availability { every: 1h; }
+goal TLA { due: 2026-09-30; topic A { estimated: 3h; } }
+constraints { finish(TLA) < 2026-09-03; }
+plan { from: 2026-09-01; }

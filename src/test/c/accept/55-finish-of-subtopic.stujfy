@@ -1,0 +1,11 @@
+// Solo el subtema LL1 tiene que terminar antes; el resto usa la fecha del objetivo.
+availability { every: 1h; }
+goal TLA {
+    due: 2026-09-10;
+    topic Gramaticas {
+        topic LL1 { estimated: 2h; }
+        topic LR { estimated: 2h; }
+    }
+}
+constraints { finish(LL1) <= deadline(TLA) - 8d; }
+plan { from: 2026-09-01; }

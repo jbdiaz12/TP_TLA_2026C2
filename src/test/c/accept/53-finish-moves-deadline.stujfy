@@ -1,0 +1,6 @@
+// La restricción adelanta Fisica al 2026-09-02, así que va antes que TLA.
+availability { every: 1h; }
+goal Fisica { due: 2026-09-30; topic B { estimated: 2h; } }
+goal TLA { due: 2026-09-10; topic A { estimated: 2h; } }
+constraints { finish(Fisica) <= 2026-09-02; }
+plan { from: 2026-09-01; }
