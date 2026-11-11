@@ -62,7 +62,9 @@ static char * _join(const char * const * names);
 static bool _isLevelAttribute(const char * name);
 static void _reportCycle(const Symbol ** path, const int depth, const Symbol * required, const Position position);
 static void _validateAttributes(const Attribute ** attributes, const int count, const char * const * allowed, const char * owner);
-static void _validateAvailability(const Availability * availability);
+static void _validateAvailability(const Availability * availability, const Scope * scope);
+static bool _timeOf(const Expression * expression, const Scope * scope, int * minutes);
+static void _validatePeriods(const Slot * slot, const Scope * scope);
 static void _validateBlocks(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateConstraints(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateCycles(const SymbolTable * table);
@@ -193,9 +195,10 @@ static void _validateAttributes(const Attribute ** attributes, const int count, 
 }
 
 /**
- * Every slot of the availability names a day, or a set of days, only once.
+ * Every slot of the availability names a day, or a set of days, only once,
+ * and its periods make sense in a single day.
  */
-static void _validateAvailability(const Availability * availability) {
+static void _validateAvailability(const Availability * availability, const Scope * scope) {
 	for (const SlotList * node = availability->slots; node != NULL; node = node->next) {
 		const Slot * slot = node->slot;
 		if (!_contains(_DAYS, slot->day)) {
@@ -211,7 +214,105 @@ static void _validateAvailability(const Availability * availability) {
 				break;
 			}
 		}
+		_validatePeriods(slot, scope);
 	}
+}
+
+/**
+ * The time of one end of a window, which is a time written as a constant
+ * (e.g., "18:00"). It reports any other value.
+ */
+static bool _timeOf(const Expression * expression, const Scope * scope, int * minutes) {
+	const Type type = typeOf(expression, scope);
+	if (type.kind == ERROR_TYPE) {
+		return false;
+	}
+	if (type.kind != TIME_TYPE) {
+		reportSemanticError(expression->position,
+			"una ventana horaria va de una hora a otra (por ejemplo, '18:00 .. 21:00'), pero este extremo es %s.", describeType(type));
+		return false;
+	}
+	if (expression->type != FACTOR_EXPRESSION || expression->factor->type != CONSTANT_FACTOR) {
+		return false;
+	}
+	*minutes = expression->factor->constant->time;
+	return true;
+}
+
+/**
+ * The periods of a day are either time windows (e.g., "18:00 .. 21:00"),
+ * which don't overlap, or a single amount of time (e.g., "2h"), which the
+ * planner places anywhere in that day. A day doesn't mix both, because the
+ * amount would be ambiguous: inside the windows, or besides them?
+ */
+static void _validatePeriods(const Slot * slot, const Scope * scope) {
+	int windowCount = 0;
+	int durationCount = 0;
+	for (const PeriodList * node = slot->periods; node != NULL; node = node->next) {
+		if (node->period->type == RANGE_PERIOD) {
+			++windowCount;
+		}
+		else {
+			++durationCount;
+		}
+	}
+	if (0 < windowCount && 0 < durationCount) {
+		reportSemanticError(slot->position, "'%s' lleva ventanas horarias o una duración, pero no las dos.", slot->day);
+		return;
+	}
+	if (1 < durationCount) {
+		reportSemanticError(slot->position, "'%s' lleva una sola duración.", slot->day);
+		return;
+	}
+	if (durationCount == 1) {
+		const Expression * amount = slot->periods->period->amount;
+		const Type type = typeOf(amount, scope);
+		if (type.kind != ERROR_TYPE && type.kind != DURATION_TYPE) {
+			reportSemanticError(amount->position,
+				"'%s' lleva una duración o ventanas horarias, pero este valor es %s.", slot->day, describeType(type));
+			return;
+		}
+		int minutes = 0;
+		if (type.kind == DURATION_TYPE && evaluateConstant(amount, &minutes)) {
+			if (minutes <= 0) {
+				reportSemanticError(amount->position, "'%s' tiene que tener una duración mayor que cero.", slot->day);
+			}
+			else if (24 * 60 < minutes) {
+				reportSemanticError(amount->position, "un día tiene 24 horas, pero '%s' declara más.", slot->day);
+			}
+		}
+		return;
+	}
+	int * starts = calloc(windowCount, sizeof(int));
+	int * ends = calloc(windowCount, sizeof(int));
+	int valid = 0;
+	for (const PeriodList * node = slot->periods; node != NULL; node = node->next) {
+		const Period * period = node->period;
+		int start = 0;
+		int end = 0;
+		if (!_timeOf(period->from, scope, &start) || !_timeOf(period->to, scope, &end)) {
+			continue;
+		}
+		if (end <= start) {
+			reportSemanticError(period->from->position,
+				"la ventana %02d:%02d .. %02d:%02d termina antes de empezar.", start / 60, start % 60, end / 60, end % 60);
+			continue;
+		}
+		for (int k = 0; k < valid; ++k) {
+			if (start < ends[k] && starts[k] < end) {
+				reportSemanticError(period->from->position,
+					"la ventana %02d:%02d .. %02d:%02d se superpone con %02d:%02d .. %02d:%02d.",
+					start / 60, start % 60, end / 60, end % 60,
+					starts[k] / 60, starts[k] % 60, ends[k] / 60, ends[k] % 60);
+				break;
+			}
+		}
+		starts[valid] = start;
+		ends[valid] = end;
+		++valid;
+	}
+	free(starts);
+	free(ends);
 }
 
 /**
@@ -383,7 +484,7 @@ static void _validateBlocks(const SymbolTable * table, const DeclarationList * d
 			_validatePlanRange(node->declaration->plan);
 		}
 		else if (node->declaration->type == AVAILABILITY_DECLARATION) {
-			_validateAvailability(node->declaration->availability);
+			_validateAvailability(node->declaration->availability, &scope);
 		}
 	}
 }
