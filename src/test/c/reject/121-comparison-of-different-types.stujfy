@@ -1,0 +1,3 @@
+include <metodos>
+scale nivel { bajo < alto }
+rules { when estimated > alto -> Bloque(); }

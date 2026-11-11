@@ -92,7 +92,7 @@ static Type _typeOfComparison(const Expression * expression, const Type left, co
 		reportSemanticError(expression->position, "no se puede comparar %s con %s.", leftDescription, describeType(right));
 		return simpleType(ERROR_TYPE);
 	}
-	if (left.kind == LEVEL_TYPE && left.scale != right.scale) {
+	if (left.kind == LEVEL_TYPE && left.scale != NULL && right.scale != NULL && left.scale != right.scale) {
 		reportSemanticError(expression->position,
 			"no se pueden comparar niveles de escalas distintas ('%s' y '%s').", left.scale->name, right.scale->name);
 		return simpleType(ERROR_TYPE);
@@ -220,6 +220,9 @@ static Type _typeOfVariable(const Factor * factor, const Scope * scope) {
 	else if (strcmp(name, "day") == 0 || strcmp(name, "week") == 0) {
 		reportSemanticError(factor->position,
 			"'%s' solo se usa como argumento de topics o load (por ejemplo, 'load(%s)').", name, name);
+	}
+	else if (scope->hint != NULL) {
+		reportSemanticError(factor->position, "'%s' no está declarado; %s.", name, scope->hint);
 	}
 	else {
 		reportSemanticError(factor->position, "'%s' no está declarado.", name);

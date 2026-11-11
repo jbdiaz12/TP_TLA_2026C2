@@ -69,6 +69,8 @@ static void _validateBlocks(const SymbolTable * table, const DeclarationList * d
 static void _validateConstraints(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateCycles(const SymbolTable * table);
 static void _validateInvocations(const SymbolTable * table, const DeclarationList * declarations);
+static const Symbol * _scaleOfAttribute(const SymbolTable * table, const SymbolKind kind, const char * name);
+static void _validateRules(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateMemberAttributes(const MemberList * members, const char * const * allowed, const char * owner);
 static void _validatePlanAttributes(const AttributeList * list);
 static bool _hasType(const Attribute * attribute, const Expression * value, const TypeKind expected, const Scope * scope);
@@ -628,6 +630,88 @@ static void _validateInvocations(const SymbolTable * table, const DeclarationLis
 }
 
 /**
+ * The scale that the goals or the topics use for an attribute (e.g., the
+ * scale of every "difficulty"), or NULL if they use none or more than one.
+ */
+static const Symbol * _scaleOfAttribute(const SymbolTable * table, const SymbolKind kind, const char * name) {
+	const Symbol * scale = NULL;
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind != kind) {
+			continue;
+		}
+		const MemberList * members = (kind == GOAL_SYMBOL) ? symbol->goal->members : symbol->topic->members;
+		for (const MemberList * node = members; node != NULL; node = node->next) {
+			if (node->member->type != ATTRIBUTE_MEMBER || strcmp(node->member->attribute->name, name) != 0) {
+				continue;
+			}
+			const Expression * value = node->member->attribute->values->expression;
+			if (value->type != FACTOR_EXPRESSION || value->factor->type != VARIABLE_FACTOR) {
+				continue;
+			}
+			const Symbol * level = findSymbol(table, LEVEL_SYMBOL, value->factor->variable);
+			if (level == NULL) {
+				continue;
+			}
+			if (scale != NULL && scale != level->owner) {
+				return NULL;
+			}
+			scale = level->owner;
+		}
+	}
+	return scale;
+}
+
+/**
+ * A rule assigns a method to the topics that meet its condition, and the
+ * condition reads the attributes of each topic: its difficulty, the priority
+ * of its goal, and its estimated time. The rules are evaluated in order, so
+ * the default rule ("otherwise") is unique, and it goes last: any rule after
+ * it would never apply.
+ */
+static void _validateRules(const SymbolTable * table, const DeclarationList * declarations) {
+	const Variable variables[] = {
+		{ .name = "difficulty", .type = { .kind = LEVEL_TYPE, .scale = _scaleOfAttribute(table, TOPIC_SYMBOL, "difficulty") } },
+		{ .name = "estimated", .type = { .kind = DURATION_TYPE, .scale = NULL } },
+		{ .name = "priority", .type = { .kind = LEVEL_TYPE, .scale = _scaleOfAttribute(table, GOAL_SYMBOL, "priority") } }
+	};
+	const Scope scope = {
+		.table = table,
+		.variables = variables,
+		.variableCount = 3,
+		.allowsDomainFunctions = false,
+		.hint = "una regla consulta difficulty, priority, estimated o niveles de una escala"
+	};
+	const Rule * otherwise = NULL;
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		if (node->declaration->type != RULES_DECLARATION) {
+			continue;
+		}
+		for (const RuleList * item = node->declaration->rules; item != NULL; item = item->next) {
+			const Rule * rule = item->rule;
+			if (otherwise != NULL) {
+				if (rule->type == OTHERWISE_RULE) {
+					reportSemanticError(rule->position, "ya hay un 'otherwise' %s.", describePosition(otherwise->position));
+				}
+				else {
+					reportSemanticError(rule->position,
+						"esta regla está después de 'otherwise' (%s), así que nunca se aplicaría.", describePosition(otherwise->position));
+				}
+				continue;
+			}
+			if (rule->type == OTHERWISE_RULE) {
+				otherwise = rule;
+				continue;
+			}
+			const Type type = typeOf(rule->condition, &scope);
+			if (type.kind != ERROR_TYPE && type.kind != BOOLEAN_TYPE) {
+				reportSemanticError(rule->condition->position,
+					"la condición de una regla es una comparación (por ejemplo, 'difficulty >= alto'), pero esta es %s.", describeType(type));
+			}
+		}
+	}
+}
+
+/**
  * The dependencies between topics form a directed graph, and a cycle in it
  * means that no topic of the cycle can ever be studied first. A depth-first
  * search finds every cycle once: when it reaches a topic that is still in
@@ -1046,6 +1130,7 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_validateBlocks(table, program->declarations);
 	_validateConstraints(table, program->declarations);
 	_validateInvocations(table, program->declarations);
+	_validateRules(table, program->declarations);
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(table, program->declarations, node->declaration->method);

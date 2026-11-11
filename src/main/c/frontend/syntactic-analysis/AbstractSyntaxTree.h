@@ -365,6 +365,8 @@ struct Rule {
 	Expression * condition;
 	Expression * action;
 	RuleType type;
+	/** Where its keyword ("when" or "otherwise") is written. */
+	Position position;
 };
 
 struct RuleList {

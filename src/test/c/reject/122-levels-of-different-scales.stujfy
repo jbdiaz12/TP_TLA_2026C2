@@ -1,0 +1,5 @@
+include <metodos>
+scale nivel { bajo < alto }
+scale prioridad { baja < alta }
+goal TLA { topic A { difficulty: alto; } }
+rules { when difficulty >= alta -> Bloque(); }

@@ -1,0 +1,2 @@
+include <metodos>
+rules { otherwise -> Bloque(); otherwise -> Pomodoro(); }

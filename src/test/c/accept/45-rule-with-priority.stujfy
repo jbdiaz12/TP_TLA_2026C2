@@ -1,0 +1,7 @@
+include <metodos>
+scale prioridad { baja < alta }
+goal TLA { priority: alta; topic A { estimated: 6h; } }
+rules {
+    when priority >= alta and estimated > 4h -> Espaciado();
+    otherwise -> Pomodoro();
+}

@@ -103,8 +103,8 @@ ConstraintList * SingletonConstraintListSemanticAction(Expression * constraint);
 
 /** Rules. */
 
-Rule * OtherwiseRuleSemanticAction(Expression * action);
-Rule * WhenRuleSemanticAction(Expression * condition, Expression * action);
+Rule * OtherwiseRuleSemanticAction(Expression * action, Position position);
+Rule * WhenRuleSemanticAction(Expression * condition, Expression * action, Position position);
 
 RuleList * RuleListSemanticAction(RuleList * list, Rule * rule);
 RuleList * SingletonRuleListSemanticAction(Rule * rule);

@@ -470,12 +470,13 @@ ConstraintList * ConstraintListSemanticAction(ConstraintList * list, Expression 
 
 /** Rules. */
 
-Rule * WhenRuleSemanticAction(Expression * condition, Expression * action) {
+Rule * WhenRuleSemanticAction(Expression * condition, Expression * action, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Rule * rule = calloc(1, sizeof(Rule));
 	rule->condition = condition;
 	rule->action = action;
 	rule->type = WHEN_RULE;
+	rule->position = position;
 	return rule;
 }
 
@@ -483,12 +484,13 @@ Rule * WhenRuleSemanticAction(Expression * condition, Expression * action) {
  * The default rule carries no condition, so its field stays NULL: the
  * destructor of an expression already tolerates it.
  */
-Rule * OtherwiseRuleSemanticAction(Expression * action) {
+Rule * OtherwiseRuleSemanticAction(Expression * action, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Rule * rule = calloc(1, sizeof(Rule));
 	rule->condition = NULL;
 	rule->action = action;
 	rule->type = OTHERWISE_RULE;
+	rule->position = position;
 	return rule;
 }
 

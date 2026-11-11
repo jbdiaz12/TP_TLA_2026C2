@@ -330,8 +330,8 @@ ruleList: rule																			{ $$ = SingletonRuleListSemanticAction($1); }
 	| ruleList[list] rule[item]															{ $$ = RuleListSemanticAction($list, $item); }
 	;
 
-rule: WHEN expression[condition] ARROW expression[action] SEMICOLON						{ $$ = WhenRuleSemanticAction($condition, $action); }
-	| OTHERWISE ARROW expression[action] SEMICOLON										{ $$ = OtherwiseRuleSemanticAction($action); }
+rule: WHEN expression[condition] ARROW expression[action] SEMICOLON						{ $$ = WhenRuleSemanticAction($condition, $action, POSITION(@1)); }
+	| OTHERWISE ARROW expression[action] SEMICOLON										{ $$ = OtherwiseRuleSemanticAction($action, POSITION(@1)); }
 	;
 
 /** Plan. */

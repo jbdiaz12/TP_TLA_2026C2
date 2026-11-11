@@ -26,7 +26,11 @@ typedef enum {
 
 typedef struct {
 	TypeKind kind;
-	/** The scale of a level, because only the levels of the same scale are comparable. */
+	/**
+	 * The scale of a level, because only the levels of the same scale are
+	 * comparable. It's NULL when the scale isn't known while compiling (e.g.,
+	 * the difficulty of a topic, if the topics use more than one scale).
+	 */
 	const Symbol * scale;
 } Type;
 
@@ -45,6 +49,8 @@ typedef struct {
 	const Variable * variables;
 	int variableCount;
 	bool allowsDomainFunctions;
+	/** What the expression can read, to explain an undeclared name (or NULL). */
+	const char * hint;
 } Scope;
 
 /**
