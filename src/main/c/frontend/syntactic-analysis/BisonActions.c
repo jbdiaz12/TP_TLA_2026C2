@@ -329,39 +329,43 @@ ParameterList * ParameterListSemanticAction(ParameterList * list, Parameter * pa
  * A session and a pause only differ in their type, so a single action builds
  * both of them.
  */
-Statement * DurationStatementSemanticAction(Expression * duration, StatementType type) {
+Statement * DurationStatementSemanticAction(Expression * duration, StatementType type, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Statement * statement = calloc(1, sizeof(Statement));
 	statement->duration = duration;
 	statement->type = type;
+	statement->position = position;
 	return statement;
 }
 
-Statement * AfterStatementSemanticAction(Expression * delay, Statement * delayedStatement) {
+Statement * AfterStatementSemanticAction(Expression * delay, Statement * delayedStatement, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Statement * statement = calloc(1, sizeof(Statement));
 	statement->delay = delay;
 	statement->delayedStatement = delayedStatement;
 	statement->type = AFTER_STATEMENT;
+	statement->position = position;
 	return statement;
 }
 
-Statement * RepeatStatementSemanticAction(Expression * count, StatementList * body) {
+Statement * RepeatStatementSemanticAction(Expression * count, StatementList * body, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Statement * statement = calloc(1, sizeof(Statement));
 	statement->count = count;
 	statement->repeatBody = body;
 	statement->type = REPEAT_STATEMENT;
+	statement->position = position;
 	return statement;
 }
 
-Statement * ForStatementSemanticAction(char * variable, Expression * iterable, StatementList * body) {
+Statement * ForStatementSemanticAction(char * variable, Expression * iterable, StatementList * body, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Statement * statement = calloc(1, sizeof(Statement));
 	statement->variable = variable;
 	statement->iterable = iterable;
 	statement->forBody = body;
 	statement->type = FOR_STATEMENT;
+	statement->position = position;
 	return statement;
 }
 

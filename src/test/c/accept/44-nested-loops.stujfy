@@ -1,0 +1,5 @@
+method Intensivo(intervalos: list default [1d, 2d], ciclos: integer default 2) {
+    repeat ciclos {
+        for intervalo in intervalos { after intervalo session 30m; }
+    }
+}

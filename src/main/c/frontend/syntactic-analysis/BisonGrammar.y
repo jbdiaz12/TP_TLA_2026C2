@@ -371,11 +371,11 @@ statementList: statement																{ $$ = SingletonStatementListSemanticAct
 	| statementList[list] statement[item]												{ $$ = StatementListSemanticAction($list, $item); }
 	;
 
-statement: SESSION expression[duration] SEMICOLON										{ $$ = DurationStatementSemanticAction($duration, SESSION_STATEMENT); }
-	| PAUSE expression[duration] SEMICOLON												{ $$ = DurationStatementSemanticAction($duration, PAUSE_STATEMENT); }
-	| AFTER expression[delay] statement[delayed]										{ $$ = AfterStatementSemanticAction($delay, $delayed); }
-	| REPEAT expression[count] OPEN_BRACE statementList[body] CLOSE_BRACE				{ $$ = RepeatStatementSemanticAction($count, $body); }
-	| FOR IDENTIFIER[variable] IN expression[iterable] OPEN_BRACE statementList[body] CLOSE_BRACE	{ $$ = ForStatementSemanticAction($variable, $iterable, $body); }
+statement: SESSION expression[duration] SEMICOLON										{ $$ = DurationStatementSemanticAction($duration, SESSION_STATEMENT, POSITION(@1)); }
+	| PAUSE expression[duration] SEMICOLON												{ $$ = DurationStatementSemanticAction($duration, PAUSE_STATEMENT, POSITION(@1)); }
+	| AFTER expression[delay] statement[delayed]										{ $$ = AfterStatementSemanticAction($delay, $delayed, POSITION(@1)); }
+	| REPEAT expression[count] OPEN_BRACE statementList[body] CLOSE_BRACE				{ $$ = RepeatStatementSemanticAction($count, $body, POSITION(@1)); }
+	| FOR IDENTIFIER[variable] IN expression[iterable] OPEN_BRACE statementList[body] CLOSE_BRACE	{ $$ = ForStatementSemanticAction($variable, $iterable, $body, POSITION(@variable)); }
 	;
 
 /** Goals and topics. */

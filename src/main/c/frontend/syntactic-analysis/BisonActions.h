@@ -71,10 +71,10 @@ Parameter * ParameterSemanticAction(char * name, char * type, Expression * defau
 ParameterList * ParameterListSemanticAction(ParameterList * list, Parameter * parameter);
 ParameterList * SingletonParameterListSemanticAction(Parameter * parameter);
 
-Statement * AfterStatementSemanticAction(Expression * delay, Statement * delayedStatement);
-Statement * DurationStatementSemanticAction(Expression * duration, StatementType type);
-Statement * ForStatementSemanticAction(char * variable, Expression * iterable, StatementList * body);
-Statement * RepeatStatementSemanticAction(Expression * count, StatementList * body);
+Statement * AfterStatementSemanticAction(Expression * delay, Statement * delayedStatement, Position position);
+Statement * DurationStatementSemanticAction(Expression * duration, StatementType type, Position position);
+Statement * ForStatementSemanticAction(char * variable, Expression * iterable, StatementList * body, Position position);
+Statement * RepeatStatementSemanticAction(Expression * count, StatementList * body, Position position);
 
 StatementList * SingletonStatementListSemanticAction(Statement * statement);
 StatementList * StatementListSemanticAction(StatementList * list, Statement * statement);

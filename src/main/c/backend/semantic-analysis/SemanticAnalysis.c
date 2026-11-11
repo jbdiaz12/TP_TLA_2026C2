@@ -82,7 +82,7 @@ static void _validateLevels(const SymbolTable * table);
 static void _validateNestedTopics(const MemberList * members);
 static void _validateRequirements(const SymbolTable * table);
 static void _validateUniqueBlock(const Declaration ** first, const Declaration * declaration, const char * keyword);
-static void _validateMethod(const DeclarationList * declarations, const Method * method);
+static void _validateMethod(const SymbolTable * table, const DeclarationList * declarations, const Method * method);
 static void _validateMethodName(const DeclarationList * declarations, const Method * method);
 static void _validateParameters(const Method * method);
 
@@ -928,9 +928,10 @@ static void _validateUniqueBlock(const Declaration ** first, const Declaration *
 	}
 }
 
-static void _validateMethod(const DeclarationList * declarations, const Method * method) {
+static void _validateMethod(const SymbolTable * table, const DeclarationList * declarations, const Method * method) {
 	_validateMethodName(declarations, method);
 	_validateParameters(method);
+	validateMethodBody(table, method);
 }
 
 /**
@@ -1017,7 +1018,7 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_validateConstraints(table, program->declarations);
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
-			_validateMethod(program->declarations, node->declaration->method);
+			_validateMethod(table, program->declarations, node->declaration->method);
 		}
 	}
 	destroySymbolTable(table);

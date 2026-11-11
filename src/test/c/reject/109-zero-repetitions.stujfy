@@ -1,0 +1,1 @@
+method Lectura() { repeat 0 { session 1h; } }

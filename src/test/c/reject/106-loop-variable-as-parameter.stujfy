@@ -1,0 +1,1 @@
+method Lectura(i: list) { for i in i { session i; } }

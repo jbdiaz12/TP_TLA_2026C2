@@ -1,0 +1,1 @@
+method Lectura(bloque: duration) { repeat bloque { session 1h; } }

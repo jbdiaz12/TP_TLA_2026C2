@@ -199,11 +199,12 @@ static Type _typeOfFactor(const Factor * factor, const Scope * scope) {
 
 /**
  * A name inside an expression is a variable of the scope (e.g., a parameter
- * of a method), or a level of a scale.
+ * of a method), or a level of a scale. The variables are searched from the
+ * innermost one, so the variable of a loop hides any other with its name.
  */
 static Type _typeOfVariable(const Factor * factor, const Scope * scope) {
 	const char * name = factor->variable;
-	for (int k = 0; k < scope->variableCount; ++k) {
+	for (int k = scope->variableCount - 1; 0 <= k; --k) {
 		if (strcmp(scope->variables[k].name, name) == 0) {
 			return scope->variables[k].type;
 		}

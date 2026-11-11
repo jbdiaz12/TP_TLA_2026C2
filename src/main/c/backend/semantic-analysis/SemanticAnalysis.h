@@ -5,6 +5,7 @@
 #include "../../support/logging/Logger.h"
 #include "../../support/type/CompilationStatus.h"
 #include "../../support/type/ModuleDestructor.h"
+#include "MethodValidation.h"
 #include "SemanticError.h"
 #include "SymbolTable.h"
 #include "TypeChecking.h"

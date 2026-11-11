@@ -251,6 +251,8 @@ struct Statement {
 		};
 	};
 	StatementType type;
+	/** Where its keyword is written (e.g., "session" or "for"). */
+	Position position;
 };
 
 struct StatementList {
