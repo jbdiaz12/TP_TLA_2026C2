@@ -331,6 +331,7 @@ struct Slot {
 	/** The name of a day, or of a set of days. */
 	char * day;
 	PeriodList * periods;
+	Position position;
 };
 
 struct SlotList {

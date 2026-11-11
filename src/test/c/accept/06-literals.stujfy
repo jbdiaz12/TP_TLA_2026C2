@@ -1,8 +1,6 @@
 goal Literales {
-    date: 2026-12-05;
-    time: 18:00;
-    duration: 2h30m;
-    week: 1w;
-    integer: 42;
-    string: "Teoría de lenguajes";
+    description: "Teoría de lenguajes";
+    due: 2026-12-05;
+    topic Clase { estimated: 2h30m; fixed: 2026-11-20, 18:00, 90m; }
 }
+constraints { topics(day) <= 2; load(week) <= 1w; }

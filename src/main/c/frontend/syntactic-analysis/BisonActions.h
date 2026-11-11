@@ -89,7 +89,7 @@ Period * SinglePeriodSemanticAction(Expression * amount);
 PeriodList * PeriodListSemanticAction(PeriodList * list, Period * period);
 PeriodList * SingletonPeriodListSemanticAction(Period * period);
 
-Slot * SlotSemanticAction(char * day, PeriodList * periods);
+Slot * SlotSemanticAction(char * day, PeriodList * periods, Position position);
 
 SlotList * SingletonSlotListSemanticAction(Slot * slot);
 SlotList * SlotListSemanticAction(SlotList * list, Slot * slot);

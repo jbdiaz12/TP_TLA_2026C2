@@ -1,6 +1,8 @@
-goal Listas {
-    intervals: [1d, 3d, 7d, 21d];
-    empty: [];
-    nullary: now();
-    arguments: between(09:00, 18:00);
+method Repasar(unidad: duration default 30m, intervalos: list default []) {
+    session unidad;
+    for i in intervalos { after i session unidad; }
+}
+goal TLA {
+    topic A { method: Repasar(30m, [1d, 3d, 7d, 21d]); }
+    topic B { method: Repasar(); }
 }

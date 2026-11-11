@@ -19,6 +19,21 @@ typedef struct {
 	VisitState state;
 } Visit;
 
+/** The attributes that every block admits, in alphabetical order. */
+static const char * const _GOAL_ATTRIBUTES[] = { "description", "due", "priority", NULL };
+static const char * const _PLAN_ATTRIBUTES[] = { "from", "strategy", "until", NULL };
+static const char * const _TOPIC_ATTRIBUTES[] = { "description", "difficulty", "estimated", "fixed", "method", "requires", NULL };
+
+/**
+ * The days of the availability: a single day, or a set of them. When a day
+ * belongs to more than one declared set, the most specific one wins (e.g.,
+ * "sunday" wins over "every"), which is resolved by the planner.
+ */
+static const char * const _DAYS[] = {
+	"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+	"weekdays", "weekend", "every", NULL
+};
+
 /** Shutdown module's internal state. */
 void _shutdownSemanticAnalysisModule() {
 	if (_logger != NULL) {
@@ -46,10 +61,17 @@ static Symbol * _findTopicSymbol(const SymbolTable * table, const Topic * topic)
 static void _reportSemanticError(const Position position, const char * const format, ...);
 static void _resolveGoals(SymbolTable * table, const DeclarationList * declarations);
 static void _setGoal(const SymbolTable * table, const Topic * topic, Symbol * goal);
+static bool _contains(const char * const * names, const char * name);
 static int _indexOfVisit(const Visit * visits, const int count, const Symbol * topic);
+static char * _join(const char * const * names);
 static bool _isLevelAttribute(const char * name);
 static void _reportCycle(const Symbol ** path, const int depth, const Symbol * required, const Position position);
+static void _validateAttributes(const Attribute ** attributes, const int count, const char * const * allowed, const char * owner);
+static void _validateAvailability(const Availability * availability);
+static void _validateBlocks(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateCycles(const SymbolTable * table);
+static void _validateMemberAttributes(const MemberList * members, const char * const * allowed, const char * owner);
+static void _validatePlanAttributes(const AttributeList * list);
 static void _visit(const SymbolTable * table, Visit * visits, const int count, const Symbol ** path, const int depth, const int index);
 static void _validateLevel(const SymbolTable * table, const Attribute * attribute);
 static void _validateLevels(const SymbolTable * table);
@@ -110,6 +132,152 @@ static void _setGoal(const SymbolTable * table, const Topic * topic, Symbol * go
 			_setGoal(table, node->member->topic, goal);
 		}
 	}
+}
+
+/**
+ * Whether a list of names, ended by NULL, contains a name.
+ */
+static bool _contains(const char * const * names, const char * name) {
+	for (int k = 0; names[k] != NULL; ++k) {
+		if (strcmp(names[k], name) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Joins a list of names, ended by NULL, separated by commas. The result must
+ * be freed.
+ */
+static char * _join(const char * const * names) {
+	size_t length = 1;
+	for (int k = 0; names[k] != NULL; ++k) {
+		length += strlen(names[k]) + strlen(", ");
+	}
+	char * joined = calloc(length, sizeof(char));
+	for (int k = 0; names[k] != NULL; ++k) {
+		if (0 < k) {
+			strcat(joined, ", ");
+		}
+		strcat(joined, names[k]);
+	}
+	return joined;
+}
+
+/**
+ * The attributes of a block are the ones that block admits, and each of them
+ * is declared once: a second "estimated" would contradict the first, and a
+ * second "requires" is written as more values of the first one.
+ */
+static void _validateAttributes(const Attribute ** attributes, const int count, const char * const * allowed, const char * owner) {
+	for (int k = 0; k < count; ++k) {
+		const Attribute * attribute = attributes[k];
+		if (!_contains(allowed, attribute->name)) {
+			char * names = _join(allowed);
+			_reportSemanticError(attribute->position,
+				"'%s' no es un atributo %s; los atributos válidos son: %s.", attribute->name, owner, names);
+			free(names);
+			continue;
+		}
+		for (int previous = 0; previous < k; ++previous) {
+			if (strcmp(attributes[previous]->name, attribute->name) == 0) {
+				_reportSemanticError(attribute->position,
+					"el atributo '%s' ya está declarado %s.", attribute->name, _describe(attributes[previous]->position));
+				break;
+			}
+		}
+	}
+}
+
+/**
+ * Every slot of the availability names a day, or a set of days, only once.
+ */
+static void _validateAvailability(const Availability * availability) {
+	for (const SlotList * node = availability->slots; node != NULL; node = node->next) {
+		const Slot * slot = node->slot;
+		if (!_contains(_DAYS, slot->day)) {
+			char * days = _join(_DAYS);
+			_reportSemanticError(slot->position, "'%s' no es un día; los días válidos son: %s.", slot->day, days);
+			free(days);
+			continue;
+		}
+		for (const SlotList * previous = availability->slots; previous != node; previous = previous->next) {
+			if (strcmp(previous->slot->day, slot->day) == 0) {
+				_reportSemanticError(slot->position,
+					"'%s' ya está declarado %s.", slot->day, _describe(previous->slot->position));
+				break;
+			}
+		}
+	}
+}
+
+/**
+ * Validates the attributes of every goal, topic and plan, and the days of
+ * the availability.
+ */
+static void _validateBlocks(const SymbolTable * table, const DeclarationList * declarations) {
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind == GOAL_SYMBOL) {
+			_validateMemberAttributes(symbol->goal->members, _GOAL_ATTRIBUTES, "de un objetivo");
+		}
+		else if (symbol->kind == TOPIC_SYMBOL) {
+			_validateMemberAttributes(symbol->topic->members, _TOPIC_ATTRIBUTES, "de un tema");
+		}
+	}
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		if (node->declaration->type == PLAN_DECLARATION) {
+			_validatePlanAttributes(node->declaration->plan);
+		}
+		else if (node->declaration->type == AVAILABILITY_DECLARATION) {
+			_validateAvailability(node->declaration->availability);
+		}
+	}
+}
+
+/**
+ * Validates the attributes of a goal or a topic, which are mixed with the
+ * topics nested inside it.
+ */
+static void _validateMemberAttributes(const MemberList * members, const char * const * allowed, const char * owner) {
+	int count = 0;
+	for (const MemberList * node = members; node != NULL; node = node->next) {
+		if (node->member->type == ATTRIBUTE_MEMBER) {
+			++count;
+		}
+	}
+	if (count == 0) {
+		return;
+	}
+	const Attribute ** attributes = calloc(count, sizeof(Attribute *));
+	int k = 0;
+	for (const MemberList * node = members; node != NULL; node = node->next) {
+		if (node->member->type == ATTRIBUTE_MEMBER) {
+			attributes[k++] = node->member->attribute;
+		}
+	}
+	_validateAttributes(attributes, count, allowed, owner);
+	free(attributes);
+}
+
+/**
+ * Validates the attributes of the plan.
+ */
+static void _validatePlanAttributes(const AttributeList * list) {
+	int count = 0;
+	for (const AttributeList * node = list; node != NULL; node = node->next) {
+		++count;
+	}
+	if (count == 0) {
+		return;
+	}
+	const Attribute ** attributes = calloc(count, sizeof(Attribute *));
+	int k = 0;
+	for (const AttributeList * node = list; node != NULL; node = node->next) {
+		attributes[k++] = node->attribute;
+	}
+	_validateAttributes(attributes, count, _PLAN_ATTRIBUTES, "del plan");
+	free(attributes);
 }
 
 /**
@@ -602,6 +770,7 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_validateRequirements(table);
 	_validateLevels(table);
 	_validateCycles(table);
+	_validateBlocks(table, program->declarations);
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(program->declarations, node->declaration->method);

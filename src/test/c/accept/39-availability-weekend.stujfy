@@ -1,0 +1,1 @@
+availability { weekdays: 3h; weekend: 5h; }

@@ -1,5 +1,3 @@
 // Rechazo semántico: "load" devuelve una duración, y se la compara contra un
 // entero. El análisis sintáctico no tipa las expresiones.
-goal TLA {
-    check: load(day) <= 2;
-}
+constraints { load(day) <= 2; }

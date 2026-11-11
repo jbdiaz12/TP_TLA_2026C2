@@ -417,11 +417,12 @@ PeriodList * PeriodListSemanticAction(PeriodList * list, Period * period) {
 	return list;
 }
 
-Slot * SlotSemanticAction(char * day, PeriodList * periods) {
+Slot * SlotSemanticAction(char * day, PeriodList * periods, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Slot * slot = calloc(1, sizeof(Slot));
 	slot->day = day;
 	slot->periods = periods;
+	slot->position = position;
 	return slot;
 }
 

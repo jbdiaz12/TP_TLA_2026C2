@@ -301,7 +301,7 @@ slotList: slot																			{ $$ = SingletonSlotListSemanticAction($1); }
 	| slotList[list] slot[item]															{ $$ = SlotListSemanticAction($list, $item); }
 	;
 
-slot: IDENTIFIER[day] COLON periodList[periods] SEMICOLON								{ $$ = SlotSemanticAction($day, $periods); }
+slot: IDENTIFIER[day] COLON periodList[periods] SEMICOLON								{ $$ = SlotSemanticAction($day, $periods, POSITION(@day)); }
 	;
 
 periodList: period																		{ $$ = SingletonPeriodListSemanticAction($1); }
