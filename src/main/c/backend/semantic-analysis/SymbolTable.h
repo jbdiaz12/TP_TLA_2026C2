@@ -38,6 +38,8 @@ struct Symbol {
 	 * it's unknown), or the scale of a level.
 	 */
 	Symbol * owner;
+	/** The topic that contains a nested topic, or NULL. */
+	Symbol * parent;
 	/** The order of a level inside its scale, starting at zero (the lowest). */
 	int rank;
 	Symbol * next;

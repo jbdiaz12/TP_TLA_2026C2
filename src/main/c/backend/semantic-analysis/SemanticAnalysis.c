@@ -48,10 +48,10 @@ ModuleDestructor initializeSemanticAnalysisModule() {
 /* PRIVATE FUNCTIONS */
 
 static Symbol * _declare(SymbolTable * table, const SymbolKind kind, const char * name, const Position position);
-static void _declareMembers(SymbolTable * table, const MemberList * members, Symbol * goal);
+static void _declareMembers(SymbolTable * table, const MemberList * members, Symbol * goal, Symbol * parent);
 static void _declareScale(SymbolTable * table, const Scale * scale);
 static void _declareSymbols(SymbolTable * table, const DeclarationList * declarations);
-static void _declareTopic(SymbolTable * table, const Topic * topic, Symbol * goal);
+static void _declareTopic(SymbolTable * table, const Topic * topic, Symbol * goal, Symbol * parent);
 static const Method * _findPreviousMethod(const DeclarationList * declarations, const Method * method);
 static Symbol * _findTopicSymbol(const SymbolTable * table, const Topic * topic);
 static void _resolveGoals(SymbolTable * table, const DeclarationList * declarations);
@@ -1196,12 +1196,12 @@ static Symbol * _declare(SymbolTable * table, const SymbolKind kind, const char 
 
 /**
  * Declares the topics nested inside a goal or a topic, which belong to the
- * same goal.
+ * same goal. The parent is the topic that contains them, or NULL.
  */
-static void _declareMembers(SymbolTable * table, const MemberList * members, Symbol * goal) {
+static void _declareMembers(SymbolTable * table, const MemberList * members, Symbol * goal, Symbol * parent) {
 	for (const MemberList * node = members; node != NULL; node = node->next) {
 		if (node->member->type == TOPIC_MEMBER) {
-			_declareTopic(table, node->member->topic, goal);
+			_declareTopic(table, node->member->topic, goal, parent);
 		}
 	}
 }
@@ -1246,11 +1246,11 @@ static void _declareSymbols(SymbolTable * table, const DeclarationList * declara
 			case GOAL_DECLARATION: {
 				Symbol * goal = _declare(table, GOAL_SYMBOL, declaration->goal->name, declaration->goal->position);
 				goal->goal = declaration->goal;
-				_declareMembers(table, declaration->goal->members, goal);
+				_declareMembers(table, declaration->goal->members, goal, NULL);
 				break;
 			}
 			case TOPIC_DECLARATION:
-				_declareTopic(table, declaration->topic, NULL);
+				_declareTopic(table, declaration->topic, NULL, NULL);
 				break;
 			case SCALE_DECLARATION:
 				_declareScale(table, declaration->scale);
@@ -1272,11 +1272,12 @@ static void _declareSymbols(SymbolTable * table, const DeclarationList * declara
  * declared outside of any goal ("topic X in Goal") is resolved later, once
  * every goal is known.
  */
-static void _declareTopic(SymbolTable * table, const Topic * topic, Symbol * goal) {
+static void _declareTopic(SymbolTable * table, const Topic * topic, Symbol * goal, Symbol * parent) {
 	Symbol * symbol = _declare(table, TOPIC_SYMBOL, topic->name, topic->position);
 	symbol->topic = topic;
 	symbol->owner = goal;
-	_declareMembers(table, topic->members, goal);
+	symbol->parent = parent;
+	_declareMembers(table, topic->members, goal, symbol);
 }
 
 /**
@@ -1403,7 +1404,7 @@ static void _validateParameters(const Method * method) {
 
 /* PUBLIC FUNCTIONS */
 
-CompilationStatus executeSemanticAnalysis(Program * program) {
+CompilationStatus executeSemanticAnalysis(Program * program, SymbolTable ** symbolTable) {
 	logDebugging(_logger, "Analyzing...");
 	resetSemanticErrors();
 	SymbolTable * table = createSymbolTable();
@@ -1416,17 +1417,17 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_validateConstraints(table, program->declarations);
 	_validateInvocations(table, program->declarations);
 	_validateRules(table, program->declarations);
-	if (semanticErrorCount() == 0) {
-		_validateEstimates(program->declarations);
-		_validatePlanRequirements(table, program->declarations);
-		_validateFixedSessions(table, program->declarations);
-	}
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(table, program->declarations, node->declaration->method);
 		}
 	}
-	destroySymbolTable(table);
+	if (semanticErrorCount() == 0) {
+		_validateEstimates(program->declarations);
+		_validatePlanRequirements(table, program->declarations);
+		_validateFixedSessions(table, program->declarations);
+	}
+	*symbolTable = table;
 	const unsigned int errors = semanticErrorCount();
 	logDebugging(_logger, "Analysis is done (errors=%u).", errors);
 	return (errors == 0) ? SUCCEEDED : FAILED;

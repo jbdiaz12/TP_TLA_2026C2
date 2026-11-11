@@ -1,3 +1,4 @@
+#include "backend/planning/Planner.h"
 #include "backend/semantic-analysis/SemanticAnalysis.h"
 #include "frontend/Frontend.h"
 #include "frontend/lexical-analysis/FlexActions.h"
@@ -26,19 +27,29 @@ const int main(const int length, const char ** arguments) {
 		initializeFlexActionsModule(lexicalAnalyzer),
 		initializeBisonActionsModule(&compilerState),
 		initializeFrontendModule(lexicalAnalyzer),
-		initializeSemanticAnalysisModule()
+		initializeSemanticAnalysisModule(),
+		initializePlannerModule()
 	};
 	CompilationStatus compilationStatus = executeSyntacticAnalysis();
 	Program * program = compilerState.abstractSyntaxtTree;
 	if (compilationStatus == SUCCEEDED) {
 		logInformation(logger, "The syntactic-analysis phase accepts the input program.");
-		compilationStatus = executeSemanticAnalysis(program);
+		SymbolTable * symbolTable = NULL;
+		compilationStatus = executeSemanticAnalysis(program, &symbolTable);
 		if (compilationStatus == SUCCEEDED) {
 			logInformation(logger, "The semantic-analysis phase accepts the input program.");
+			compilationStatus = executePlanning(program, symbolTable);
+			if (compilationStatus == SUCCEEDED) {
+				logInformation(logger, "The planning phase schedules the input program.");
+			}
+			else {
+				logError(logger, "The planning phase can't schedule the input program.");
+			}
 		}
 		else {
 			logError(logger, "The semantic-analysis phase rejects the input program.");
 		}
+		destroySymbolTable(symbolTable);
 	}
 	else {
 		logError(logger, "The syntactic-analysis phase rejects the input program.");

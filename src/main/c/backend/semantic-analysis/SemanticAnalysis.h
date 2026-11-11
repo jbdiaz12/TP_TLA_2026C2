@@ -23,8 +23,9 @@ ModuleDestructor initializeSemanticAnalysisModule();
 /**
  * Validates that a syntactically valid program also makes sense in the domain
  * of the study plans. It reports every error found, not only the first one,
- * and fails if there is at least one.
+ * and fails if there is at least one. It returns the symbol table that it
+ * builds, which the caller destroys (before the AST it points to).
  */
-CompilationStatus executeSemanticAnalysis(Program * program);
+CompilationStatus executeSemanticAnalysis(Program * program, SymbolTable ** symbolTable);
 
 #endif

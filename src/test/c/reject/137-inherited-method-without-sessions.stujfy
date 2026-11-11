@@ -1,0 +1,5 @@
+// B hereda el método de A, que con 0 ciclos no tiene sesiones.
+include <metodos>
+availability { every: 2h; }
+goal TLA { due: 2026-12-05; topic A { method: Pomodoro(25m, 5m, 0); topic B { estimated: 2h; } } }
+plan { from: 2026-09-01; }
