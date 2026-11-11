@@ -68,6 +68,7 @@ static void _validatePeriods(const Slot * slot, const Scope * scope);
 static void _validateBlocks(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateConstraints(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateCycles(const SymbolTable * table);
+static void _validateInvocations(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateMemberAttributes(const MemberList * members, const char * const * allowed, const char * owner);
 static void _validatePlanAttributes(const AttributeList * list);
 static bool _hasType(const Attribute * attribute, const Expression * value, const TypeKind expected, const Scope * scope);
@@ -599,6 +600,34 @@ static void _validateConstraints(const SymbolTable * table, const DeclarationLis
 }
 
 /**
+ * Validates every invocation of a method: the ones that assign a method to a
+ * topic directly, and the actions of the rules.
+ */
+static void _validateInvocations(const SymbolTable * table, const DeclarationList * declarations) {
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind != TOPIC_SYMBOL) {
+			continue;
+		}
+		for (const MemberList * node = symbol->topic->members; node != NULL; node = node->next) {
+			if (node->member->type == ATTRIBUTE_MEMBER && strcmp(node->member->attribute->name, "method") == 0) {
+				const Expression * value = _singleValue(node->member->attribute);
+				if (value != NULL) {
+					validateInvocation(table, declarations, value, "'method'");
+				}
+			}
+		}
+	}
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		if (node->declaration->type != RULES_DECLARATION) {
+			continue;
+		}
+		for (const RuleList * rule = node->declaration->rules; rule != NULL; rule = rule->next) {
+			validateInvocation(table, declarations, rule->rule->action, "la acción de una regla");
+		}
+	}
+}
+
+/**
  * The dependencies between topics form a directed graph, and a cycle in it
  * means that no topic of the cycle can ever be studied first. A depth-first
  * search finds every cycle once: when it reaches a topic that is still in
@@ -1016,6 +1045,7 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_validateCycles(table);
 	_validateBlocks(table, program->declarations);
 	_validateConstraints(table, program->declarations);
+	_validateInvocations(table, program->declarations);
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(table, program->declarations, node->declaration->method);

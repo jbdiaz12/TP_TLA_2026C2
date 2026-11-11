@@ -1,0 +1,2 @@
+include <metodos>
+goal TLA { topic A { method: Pomodoro; } }

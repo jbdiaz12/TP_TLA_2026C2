@@ -1,3 +1,4 @@
+include <metodos>
 scale nivel { medio < medioAlto < alto }
 goal TLA {
     topic Automatas {

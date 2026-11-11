@@ -1,3 +1,4 @@
+include <metodos>
 goal TLA {
     topic Automatas { method: Pomodoro(25m, 5m, 4); }
     topic Gramaticas { method: Pomodoro(25m, 5m, 4); }

@@ -15,4 +15,13 @@
  */
 void validateMethodBody(const SymbolTable * table, const Method * method);
 
+/**
+ * Validates the invocation of a method, which assigns that method to the
+ * topics: the value of a "method" attribute, or the action of a rule. The
+ * method is declared, and the arguments fill its parameters in order, where
+ * the trailing ones can be omitted if they have a default value. The context
+ * names where the invocation is written, for the messages.
+ */
+void validateInvocation(const SymbolTable * table, const DeclarationList * declarations, const Expression * expression, const char * context);
+
 #endif

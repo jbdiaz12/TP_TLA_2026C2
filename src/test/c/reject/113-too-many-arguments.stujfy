@@ -1,0 +1,2 @@
+include <metodos>
+goal TLA { topic A { method: Bloque(1h, 2h); } }

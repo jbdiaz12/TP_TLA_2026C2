@@ -3,8 +3,10 @@
 /* PRIVATE FUNCTIONS */
 
 static bool _containsSession(const StatementList * statements);
+static const Method * _findMethod(const DeclarationList * declarations, const char * name);
 static int _countLoops(const StatementList * statements);
 static Type _parameterType(const Parameter * parameter);
+static Type _typeNamed(const char * name);
 static void _validateDefaultValue(const SymbolTable * table, const Parameter * parameter, const Type type);
 static void _validateDuration(const Expression * expression, const Scope * scope, const char * keyword, const bool admitsZero);
 static void _validateStatement(const SymbolTable * table, const Statement * statement, Variable * variables, const int count);
@@ -45,6 +47,18 @@ static bool _containsSession(const StatementList * statements) {
 }
 
 /**
+ * Finds the first method declared with a name, or NULL.
+ */
+static const Method * _findMethod(const DeclarationList * declarations, const char * name) {
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		if (node->declaration->type == METHOD_DECLARATION && strcmp(node->declaration->method->name, name) == 0) {
+			return node->declaration->method;
+		}
+	}
+	return NULL;
+}
+
+/**
  * The amount of loops in a body, which bounds how many variables a body
  * declares besides its parameters.
  */
@@ -72,17 +86,28 @@ static int _countLoops(const StatementList * statements) {
  * lists of durations (to space the sessions).
  */
 static Type _parameterType(const Parameter * parameter) {
-	if (strcmp(parameter->type, "duration") == 0) {
+	const Type type = _typeNamed(parameter->type);
+	if (type.kind == ERROR_TYPE) {
+		reportSemanticError(parameter->position,
+			"'%s' no es un tipo de parámetro; los tipos válidos son: duration, integer, list.", parameter->type);
+	}
+	return type;
+}
+
+/**
+ * The type of a parameter given its name, or ERROR_TYPE if it isn't one. It
+ * doesn't report anything, because the declaration of the method does.
+ */
+static Type _typeNamed(const char * name) {
+	if (strcmp(name, "duration") == 0) {
 		return simpleType(DURATION_TYPE);
 	}
-	if (strcmp(parameter->type, "integer") == 0) {
+	if (strcmp(name, "integer") == 0) {
 		return simpleType(INTEGER_TYPE);
 	}
-	if (strcmp(parameter->type, "list") == 0) {
+	if (strcmp(name, "list") == 0) {
 		return simpleType(LIST_TYPE);
 	}
-	reportSemanticError(parameter->position,
-		"'%s' no es un tipo de parámetro; los tipos válidos son: duration, integer, list.", parameter->type);
 	return simpleType(ERROR_TYPE);
 }
 
@@ -198,6 +223,77 @@ static void _validateStatements(const SymbolTable * table, const StatementList *
 }
 
 /* PUBLIC FUNCTIONS */
+
+void validateInvocation(const SymbolTable * table, const DeclarationList * declarations, const Expression * expression, const char * context) {
+	if (expression->type != FACTOR_EXPRESSION || expression->factor->type != INVOCATION_FACTOR) {
+		reportSemanticError(expression->position,
+			"%s lleva la llamada a un método, con paréntesis (por ejemplo, 'Pomodoro()').", context);
+		return;
+	}
+	const Factor * invocation = expression->factor;
+	const Method * method = _findMethod(declarations, invocation->function);
+	if (method == NULL) {
+		reportSemanticError(invocation->position,
+			"el método '%s' no está declarado (los de la librería estándar se incluyen con 'include <metodos>').", invocation->function);
+		return;
+	}
+	int required = 0;
+	int total = 0;
+	for (const ParameterList * node = method->parameters; node != NULL; node = node->next) {
+		++total;
+		if (node->parameter->defaultValue == NULL) {
+			required = total;
+		}
+	}
+	int count = 0;
+	for (const ExpressionList * node = invocation->arguments; node != NULL; node = node->next) {
+		++count;
+	}
+	if (count < required || total < count) {
+		const char * noun = (total == 1) ? "argumento" : "argumentos";
+		if (required == total) {
+			reportSemanticError(invocation->position,
+				"'%s' recibe %d %s, pero la llamada tiene %d.", method->name, total, noun, count);
+		}
+		else if (required == 0) {
+			reportSemanticError(invocation->position,
+				"'%s' recibe como máximo %d %s, pero la llamada tiene %d.", method->name, total, noun, count);
+		}
+		else {
+			reportSemanticError(invocation->position,
+				"'%s' recibe entre %d y %d argumentos, pero la llamada tiene %d.", method->name, required, total, count);
+		}
+		return;
+	}
+	const Scope scope = {
+		.table = table,
+		.variables = NULL,
+		.variableCount = 0,
+		.allowsDomainFunctions = false
+	};
+	const ParameterList * parameter = method->parameters;
+	int position = 1;
+	for (const ExpressionList * node = invocation->arguments; node != NULL; node = node->next) {
+		const Type expected = _typeNamed(parameter->parameter->type);
+		const Type type = typeOf(node->expression, &scope);
+		if (expected.kind != ERROR_TYPE && type.kind != ERROR_TYPE && expected.kind != type.kind) {
+			const char * expectedDescription = describeType(expected);
+			reportSemanticError(node->expression->position,
+				"el argumento %d de '%s' ('%s') tiene que ser %s, pero es %s.",
+				position, method->name, parameter->parameter->name, expectedDescription, describeType(type));
+		}
+		else if (expected.kind == DURATION_TYPE && type.kind == DURATION_TYPE) {
+			int minutes = 0;
+			if (evaluateConstant(node->expression, &minutes) && minutes <= 0) {
+				reportSemanticError(node->expression->position,
+					"el argumento %d de '%s' ('%s') tiene que ser una duración mayor que cero.",
+					position, method->name, parameter->parameter->name);
+			}
+		}
+		parameter = parameter->next;
+		++position;
+	}
+}
 
 void validateMethodBody(const SymbolTable * table, const Method * method) {
 	int parameterCount = 0;
