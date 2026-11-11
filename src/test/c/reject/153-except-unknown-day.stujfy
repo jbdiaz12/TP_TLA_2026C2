@@ -1,0 +1,2 @@
+// 'except' lleva fechas o días de la semana.
+goal TLA { due: 2026-12-01; topic A { estimated: 1h; except: feriado; } }

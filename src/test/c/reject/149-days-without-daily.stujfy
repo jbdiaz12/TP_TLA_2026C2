@@ -1,0 +1,2 @@
+// 'days' cuenta los días de 'daily', así que no va solo.
+goal TLA { due: 2026-12-01; topic A { estimated: 2h; days: 3; } }

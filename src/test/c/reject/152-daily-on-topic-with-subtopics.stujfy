@@ -1,0 +1,2 @@
+// 'daily' va en los subtemas, no en el tema que los contiene.
+goal TLA { due: 2026-12-01; topic A { daily: 1h; topic B { estimated: 1h; } } }

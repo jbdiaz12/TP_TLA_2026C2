@@ -1,0 +1,2 @@
+// Un tema con 'daily' no lleva una sesión fija.
+goal TLA { due: 2026-12-01; topic A { daily: 1h; fixed: 2026-11-20, 18:00, 1h; } }

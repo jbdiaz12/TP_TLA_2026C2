@@ -1,0 +1,2 @@
+// Con 'daily', el total se da con 'days' o con 'estimated', no con los dos.
+goal TLA { due: 2026-12-01; topic A { daily: 1h; days: 3; estimated: 3h; } }

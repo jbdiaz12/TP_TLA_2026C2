@@ -17,9 +17,11 @@ typedef struct {
 } Visit;
 
 /** The attributes that every block admits, in alphabetical order. */
-static const char * const _GOAL_ATTRIBUTES[] = { "description", "due", "priority", NULL };
+static const char * const _GOAL_ATTRIBUTES[] = { "description", "due", "except", "priority", NULL };
 static const char * const _PLAN_ATTRIBUTES[] = { "from", "start", "strategy", "until", NULL };
-static const char * const _TOPIC_ATTRIBUTES[] = { "description", "difficulty", "estimated", "fixed", "method", "requires", NULL };
+static const char * const _TOPIC_ATTRIBUTES[] = {
+	"daily", "days", "description", "difficulty", "estimated", "except", "fixed", "method", "requires", NULL
+};
 
 /**
  * The days of the availability: a single day, or a set of them. When a day
@@ -29,6 +31,15 @@ static const char * const _TOPIC_ATTRIBUTES[] = { "description", "difficulty", "
 static const char * const _DAYS[] = {
 	"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
 	"weekdays", "weekend", "every", NULL
+};
+
+/**
+ * The days that "except" excludes, besides the dates: a day of the week, or
+ * a set of them ("every" would exclude every day, so it isn't one).
+ */
+static const char * const _EXCEPTED_DAYS[] = {
+	"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+	"weekdays", "weekend", NULL
 };
 
 /** Shutdown module's internal state. */
@@ -68,6 +79,8 @@ static void _validatePeriods(const Slot * slot, const Scope * scope);
 static void _validateBlocks(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateConstraints(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateCycles(const SymbolTable * table);
+static void _validateDailyTopics(const SymbolTable * table);
+static void _validateExceptions(const Attribute * attribute);
 static bool _estimatedOf(const Topic * topic, int * minutes);
 static const Attribute * _findAttribute(const MemberList * members, const char * name);
 static const Declaration * _findDeclaration(const DeclarationList * declarations, const DeclarationType type);
@@ -417,6 +430,27 @@ static void _validatePositiveDuration(const Attribute * attribute, const Express
 }
 
 /**
+ * The days when a goal or a topic isn't studied: days of the week, sets of
+ * them (weekdays, weekend), or dates.
+ */
+static void _validateExceptions(const Attribute * attribute) {
+	for (const ExpressionList * node = attribute->values; node != NULL; node = node->next) {
+		const Expression * value = node->expression;
+		if (value->type == FACTOR_EXPRESSION && value->factor->type == VARIABLE_FACTOR
+				&& _contains(_EXCEPTED_DAYS, value->factor->variable)) {
+			continue;
+		}
+		if (value->type == FACTOR_EXPRESSION && value->factor->type == CONSTANT_FACTOR
+				&& value->factor->constant->type == DATE_CONSTANT) {
+			continue;
+		}
+		char * days = _join(_EXCEPTED_DAYS);
+		reportSemanticError(value->position, "'except' lleva fechas o días de la semana: %s.", days);
+		free(days);
+	}
+}
+
+/**
  * Validates the values of an attribute, according to its name. The levels
  * and the requirements are validated on their own, and the methods together
  * with their invocations.
@@ -427,13 +461,18 @@ static void _validateValues(const Attribute * attribute, const Scope * scope) {
 		_validateFixedSession(attribute, scope);
 		return;
 	}
+	if (strcmp(name, "except") == 0) {
+		_validateExceptions(attribute);
+		return;
+	}
 	const bool isDate = (strcmp(name, "due") == 0 || strcmp(name, "from") == 0);
 	const bool isText = (strcmp(name, "description") == 0);
-	const bool isEstimation = (strcmp(name, "estimated") == 0);
+	const bool isEstimation = (strcmp(name, "estimated") == 0 || strcmp(name, "daily") == 0);
+	const bool isCount = (strcmp(name, "days") == 0);
 	const bool isEnd = (strcmp(name, "until") == 0);
 	const bool isStart = (strcmp(name, "start") == 0);
 	const bool isStrategy = (strcmp(name, "strategy") == 0);
-	if (!isDate && !isText && !isEstimation && !isEnd && !isStrategy && !isStart) {
+	if (!isDate && !isText && !isEstimation && !isCount && !isEnd && !isStrategy && !isStart) {
 		return;
 	}
 	const Expression * value = _singleValue(attribute);
@@ -457,6 +496,12 @@ static void _validateValues(const Attribute * attribute, const Scope * scope) {
 	}
 	else if (isStart) {
 		_hasType(attribute, value, TIME_TYPE, scope);
+	}
+	else if (isCount) {
+		int count = 0;
+		if (_hasType(attribute, value, INTEGER_TYPE, scope) && evaluateConstant(value, &count) && count <= 0) {
+			reportSemanticError(value->position, "'days' tiene que ser una cantidad de días mayor que cero, pero da %d.", count);
+		}
 	}
 	else if (_hasType(attribute, value, DURATION_TYPE, scope)) {
 		_validatePositiveDuration(attribute, value);
@@ -492,6 +537,7 @@ static void _validateBlocks(const SymbolTable * table, const DeclarationList * d
 			}
 		}
 	}
+	_validateDailyTopics(table);
 	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == PLAN_DECLARATION) {
 			_validatePlanAttributes(node->declaration->plan);
@@ -502,6 +548,44 @@ static void _validateBlocks(const SymbolTable * table, const DeclarationList * d
 		}
 		else if (node->declaration->type == AVAILABILITY_DECLARATION) {
 			_validateAvailability(node->declaration->availability, &scope);
+		}
+	}
+}
+
+/**
+ * A topic with "daily" is studied that amount every day, so it's a topic
+ * without subtopics and without a fixed session. Its total is given by
+ * "days" (the amount of days), by "estimated", or by neither (then it's
+ * studied every day until its deadline), but not by both.
+ */
+static void _validateDailyTopics(const SymbolTable * table) {
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind != TOPIC_SYMBOL) {
+			continue;
+		}
+		const MemberList * members = symbol->topic->members;
+		const Attribute * daily = _findAttribute(members, "daily");
+		const Attribute * days = _findAttribute(members, "days");
+		if (daily == NULL) {
+			if (days != NULL) {
+				reportSemanticError(days->position,
+					"'days' cuenta los días de 'daily', así que va junto con 'daily' (por ejemplo, 'daily: 1h; days: 10;').");
+			}
+			continue;
+		}
+		if (_hasSubtopics(symbol->topic)) {
+			reportSemanticError(daily->position,
+				"'%s' tiene subtemas, así que se estudia a través de ellos: 'daily' va en cada subtema.", symbol->name);
+		}
+		const Attribute * estimated = _findAttribute(members, "estimated");
+		if (days != NULL && estimated != NULL) {
+			reportSemanticError(estimated->position,
+				"con 'daily', el total se da con 'days' o con 'estimated', pero no con los dos.");
+		}
+		const Attribute * fixed = _findAttribute(members, "fixed");
+		if (fixed != NULL) {
+			reportSemanticError(fixed->position,
+				"'%s' se estudia todos los días con 'daily', así que no lleva una sesión fija.", symbol->name);
 		}
 	}
 }
@@ -809,9 +893,11 @@ static void _validatePlanRequirements(const SymbolTable * table, const Declarati
 				"el objetivo '%s' necesita 'due' (su fecha límite) para poder planificarse.", symbol->name);
 		}
 		else if (symbol->kind == TOPIC_SYMBOL && !_hasSubtopics(symbol->topic)
-				&& _findAttribute(symbol->topic->members, "estimated") == NULL) {
+				&& _findAttribute(symbol->topic->members, "estimated") == NULL
+				&& _findAttribute(symbol->topic->members, "daily") == NULL) {
 			reportSemanticError(symbol->position,
-				"el tema '%s' necesita 'estimated' (su tiempo de estudio) para poder planificarse.", symbol->name);
+				"el tema '%s' necesita 'estimated' (su tiempo de estudio total) o 'daily' (su tiempo por día) para poder planificarse.",
+				symbol->name);
 		}
 	}
 	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {

@@ -1,0 +1,2 @@
+// 'days' es una cantidad de días mayor que cero.
+goal TLA { due: 2026-12-01; topic A { daily: 1h; days: 0; } }
