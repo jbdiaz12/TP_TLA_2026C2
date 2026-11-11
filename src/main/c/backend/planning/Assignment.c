@@ -206,6 +206,7 @@ static void _place(Schedule * schedule, const Work * works, Progress * progress,
 	const Work * work = &works[candidate->work];
 	const Block * block = &work->blocks[candidate->block];
 	Progress * state = &progress[candidate->work];
+	const int number = schedule->blockCount++;
 	int cursor = start;
 	for (int s = 0; s < block->stepCount; ++s) {
 		appendEntry(schedule, (Entry) {
@@ -215,7 +216,8 @@ static void _place(Schedule * schedule, const Work * works, Progress * progress,
 			.start = cursor,
 			.duration = block->steps[s].duration,
 			.isSession = block->steps[s].isSession,
-			.isFixed = false
+			.isFixed = false,
+			.block = number
 		});
 		cursor += block->steps[s].duration;
 	}
@@ -315,7 +317,8 @@ Schedule * assignWorks(const SymbolTable * table, const Work * works, const int 
 				.start = work->fixedStart,
 				.duration = work->fixedDuration,
 				.isSession = true,
-				.isFixed = true
+				.isFixed = true,
+				.block = schedule->blockCount++
 			});
 			const int fixedEnd = (work->fixedDay * MINUTES_PER_DAY) + work->fixedStart + work->fixedDuration;
 			if (state->finish < fixedEnd) {

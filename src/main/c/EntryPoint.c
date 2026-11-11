@@ -1,3 +1,4 @@
+#include "backend/code-generation/Generator.h"
 #include "backend/planning/Planner.h"
 #include "backend/semantic-analysis/SemanticAnalysis.h"
 #include "frontend/Frontend.h"
@@ -28,7 +29,8 @@ const int main(const int length, const char ** arguments) {
 		initializeBisonActionsModule(&compilerState),
 		initializeFrontendModule(lexicalAnalyzer),
 		initializeSemanticAnalysisModule(),
-		initializePlannerModule()
+		initializePlannerModule(),
+		initializeGeneratorModule()
 	};
 	CompilationStatus compilationStatus = executeSyntacticAnalysis();
 	Program * program = compilerState.abstractSyntaxtTree;
@@ -38,13 +40,24 @@ const int main(const int length, const char ** arguments) {
 		compilationStatus = executeSemanticAnalysis(program, &symbolTable);
 		if (compilationStatus == SUCCEEDED) {
 			logInformation(logger, "The semantic-analysis phase accepts the input program.");
-			compilationStatus = executePlanning(program, symbolTable);
+			Schedule * schedule = NULL;
+			compilationStatus = executePlanning(program, symbolTable, &schedule);
 			if (compilationStatus == SUCCEEDED) {
 				logInformation(logger, "The planning phase schedules the input program.");
+				if (schedule != NULL) {
+					compilationStatus = executeGenerator(schedule);
+					if (compilationStatus == SUCCEEDED) {
+						logInformation(logger, "The code-generation phase writes the output files.");
+					}
+					else {
+						logError(logger, "The code-generation phase can't write the output files.");
+					}
+				}
 			}
 			else {
 				logError(logger, "The planning phase can't schedule the input program.");
 			}
+			destroySchedule(schedule);
 		}
 		else {
 			logError(logger, "The semantic-analysis phase rejects the input program.");

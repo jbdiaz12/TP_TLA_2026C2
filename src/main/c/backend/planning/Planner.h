@@ -19,9 +19,11 @@
 ModuleDestructor initializePlannerModule();
 
 /**
- * Schedules the plan of a program that passed the semantic-analysis. A
- * program without a plan is only validated, so it has nothing to schedule.
+ * Schedules the plan of a program that passed the semantic-analysis, and
+ * returns the resulting schedule (that the caller destroys). A program
+ * without a plan is only validated, so it has nothing to schedule, and the
+ * result is NULL, as well as when the plan can't be scheduled.
  */
-CompilationStatus executePlanning(const Program * program, const SymbolTable * table);
+CompilationStatus executePlanning(const Program * program, const SymbolTable * table, Schedule ** result);
 
 #endif

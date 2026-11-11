@@ -11,6 +11,7 @@
 /log/
 /node_modules/
 /obj/
+/out/
 
 # Files.
 .DS_Store

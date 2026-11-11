@@ -21,12 +21,16 @@ typedef struct {
 	int duration;
 	bool isSession;
 	bool isFixed;
+	/** The block that the entry belongs to: the entries of a block share it. */
+	int block;
 } Entry;
 
 typedef struct {
 	Entry * entries;
 	int count;
 	int capacity;
+	/** The amount of blocks placed, to number the next one. */
+	int blockCount;
 } Schedule;
 
 /** Adds an entry at the end of a schedule. */

@@ -336,7 +336,8 @@ static Urgency * _readUrgencies(const SymbolTable * table, const Work * works, c
 
 /* PUBLIC FUNCTIONS */
 
-CompilationStatus executePlanning(const Program * program, const SymbolTable * table) {
+CompilationStatus executePlanning(const Program * program, const SymbolTable * table, Schedule ** result) {
+	*result = NULL;
 	if (_findDeclaration(program, PLAN_DECLARATION) == NULL) {
 		logDebugging(_logger, "The program has no plan to schedule.");
 		return SUCCEEDED;
@@ -358,8 +359,11 @@ CompilationStatus executePlanning(const Program * program, const SymbolTable * t
 		_logSchedule(schedule);
 		if (planningErrorCount() == 0) {
 			_printSummary(schedule, works, count, urgencies);
+			*result = schedule;
 		}
-		destroySchedule(schedule);
+		else {
+			destroySchedule(schedule);
+		}
 		destroyWeeklyAvailability(availability);
 		free(urgencies);
 	}
