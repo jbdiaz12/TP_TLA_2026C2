@@ -404,20 +404,20 @@ attribute: IDENTIFIER[name] COLON expressionList[values] SEMICOLON						{ $$ = A
 
 /** Expressions. */
 
-expression: expression[left] OR expression[right]										{ $$ = BinaryExpressionSemanticAction($left, $right, LOGICAL_OR); }
-	| expression[left] AND expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, LOGICAL_AND); }
-	| NOT expression[operand]															{ $$ = UnaryExpressionSemanticAction($operand, LOGICAL_NOT); }
-	| expression[left] EQUAL expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_EQUAL); }
-	| expression[left] NOT_EQUAL expression[right]										{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_NOT_EQUAL); }
-	| expression[left] LESS expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_LESS); }
-	| expression[left] GREATER expression[right]										{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_GREATER); }
-	| expression[left] LESS_EQUAL expression[right]										{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_LESS_EQUAL); }
-	| expression[left] GREATER_EQUAL expression[right]									{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_GREATER_EQUAL); }
-	| expression[left] ADD expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, ARITHMETIC_ADD); }
-	| expression[left] SUB expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, ARITHMETIC_SUB); }
-	| expression[left] MUL expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, ARITHMETIC_MUL); }
-	| expression[left] DIV expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, ARITHMETIC_DIV); }
-	| factor																			{ $$ = FactorExpressionSemanticAction($1); }
+expression: expression[left] OR expression[right]										{ $$ = BinaryExpressionSemanticAction($left, $right, LOGICAL_OR, POSITION(@2)); }
+	| expression[left] AND expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, LOGICAL_AND, POSITION(@2)); }
+	| NOT expression[operand]															{ $$ = UnaryExpressionSemanticAction($operand, LOGICAL_NOT, POSITION(@1)); }
+	| expression[left] EQUAL expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_EQUAL, POSITION(@2)); }
+	| expression[left] NOT_EQUAL expression[right]										{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_NOT_EQUAL, POSITION(@2)); }
+	| expression[left] LESS expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_LESS, POSITION(@2)); }
+	| expression[left] GREATER expression[right]										{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_GREATER, POSITION(@2)); }
+	| expression[left] LESS_EQUAL expression[right]										{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_LESS_EQUAL, POSITION(@2)); }
+	| expression[left] GREATER_EQUAL expression[right]									{ $$ = BinaryExpressionSemanticAction($left, $right, COMPARE_GREATER_EQUAL, POSITION(@2)); }
+	| expression[left] ADD expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, ARITHMETIC_ADD, POSITION(@2)); }
+	| expression[left] SUB expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, ARITHMETIC_SUB, POSITION(@2)); }
+	| expression[left] MUL expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, ARITHMETIC_MUL, POSITION(@2)); }
+	| expression[left] DIV expression[right]											{ $$ = BinaryExpressionSemanticAction($left, $right, ARITHMETIC_DIV, POSITION(@2)); }
+	| factor																			{ $$ = FactorExpressionSemanticAction($1, POSITION(@1)); }
 	;
 
 factor: OPEN_PARENTHESIS expression CLOSE_PARENTHESIS									{ $$ = ParenthesizedFactorSemanticAction($2, POSITION(@$)); }

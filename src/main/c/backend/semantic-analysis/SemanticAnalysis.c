@@ -4,9 +4,6 @@
 
 static Logger * _logger = NULL;
 
-/** The amount of errors reported by the current analysis. */
-static unsigned int _errors = 0;
-
 /** The state of a topic while the dependencies are searched for cycles. */
 typedef enum {
 	UNVISITED,
@@ -55,10 +52,8 @@ static void _declareMembers(SymbolTable * table, const MemberList * members, Sym
 static void _declareScale(SymbolTable * table, const Scale * scale);
 static void _declareSymbols(SymbolTable * table, const DeclarationList * declarations);
 static void _declareTopic(SymbolTable * table, const Topic * topic, Symbol * goal);
-static const char * _describe(const Position position);
 static const Method * _findPreviousMethod(const DeclarationList * declarations, const Method * method);
 static Symbol * _findTopicSymbol(const SymbolTable * table, const Topic * topic);
-static void _reportSemanticError(const Position position, const char * const format, ...);
 static void _resolveGoals(SymbolTable * table, const DeclarationList * declarations);
 static void _setGoal(const SymbolTable * table, const Topic * topic, Symbol * goal);
 static bool _contains(const char * const * names, const char * name);
@@ -97,17 +92,17 @@ static void _resolveGoals(SymbolTable * table, const DeclarationList * declarati
 		else if (declaration->type == TOPIC_DECLARATION) {
 			const Topic * topic = declaration->topic;
 			if (topic->goal == NULL) {
-				_reportSemanticError(topic->position,
+				reportSemanticError(topic->position,
 					"el tema '%s' no pertenece a ningún objetivo: se declara dentro de un 'goal', o como 'topic %s in Objetivo'.",
 					topic->name, topic->name);
 			}
 			else {
 				Symbol * goal = findSymbol(table, GOAL_SYMBOL, topic->goal);
 				if (goal == NULL) {
-					_reportSemanticError(topic->goalPosition, "el objetivo '%s' no está declarado.", topic->goal);
+					reportSemanticError(topic->goalPosition, "el objetivo '%s' no está declarado.", topic->goal);
 				}
 				else if (goal->kind != GOAL_SYMBOL) {
-					_reportSemanticError(topic->goalPosition,
+					reportSemanticError(topic->goalPosition,
 						"'%s' es un tema, pero 'in' lleva el objetivo al que pertenece el tema.", topic->goal);
 				}
 				else {
@@ -175,15 +170,15 @@ static void _validateAttributes(const Attribute ** attributes, const int count, 
 		const Attribute * attribute = attributes[k];
 		if (!_contains(allowed, attribute->name)) {
 			char * names = _join(allowed);
-			_reportSemanticError(attribute->position,
+			reportSemanticError(attribute->position,
 				"'%s' no es un atributo %s; los atributos válidos son: %s.", attribute->name, owner, names);
 			free(names);
 			continue;
 		}
 		for (int previous = 0; previous < k; ++previous) {
 			if (strcmp(attributes[previous]->name, attribute->name) == 0) {
-				_reportSemanticError(attribute->position,
-					"el atributo '%s' ya está declarado %s.", attribute->name, _describe(attributes[previous]->position));
+				reportSemanticError(attribute->position,
+					"el atributo '%s' ya está declarado %s.", attribute->name, describePosition(attributes[previous]->position));
 				break;
 			}
 		}
@@ -198,14 +193,14 @@ static void _validateAvailability(const Availability * availability) {
 		const Slot * slot = node->slot;
 		if (!_contains(_DAYS, slot->day)) {
 			char * days = _join(_DAYS);
-			_reportSemanticError(slot->position, "'%s' no es un día; los días válidos son: %s.", slot->day, days);
+			reportSemanticError(slot->position, "'%s' no es un día; los días válidos son: %s.", slot->day, days);
 			free(days);
 			continue;
 		}
 		for (const SlotList * previous = availability->slots; previous != node; previous = previous->next) {
 			if (strcmp(previous->slot->day, slot->day) == 0) {
-				_reportSemanticError(slot->position,
-					"'%s' ya está declarado %s.", slot->day, _describe(previous->slot->position));
+				reportSemanticError(slot->position,
+					"'%s' ya está declarado %s.", slot->day, describePosition(previous->slot->position));
 				break;
 			}
 		}
@@ -302,7 +297,7 @@ static void _reportCycle(const Symbol ** path, const int depth, const Symbol * r
 		--start;
 	}
 	if (start == depth) {
-		_reportSemanticError(position, "el tema '%s' se requiere a sí mismo.", required->name);
+		reportSemanticError(position, "el tema '%s' se requiere a sí mismo.", required->name);
 		return;
 	}
 	size_t length = strlen(required->name) + 1;
@@ -315,7 +310,7 @@ static void _reportCycle(const Symbol ** path, const int depth, const Symbol * r
 		strcat(cycle, " → ");
 	}
 	strcat(cycle, required->name);
-	_reportSemanticError(position, "las dependencias forman un ciclo: %s.", cycle);
+	reportSemanticError(position, "las dependencias forman un ciclo: %s.", cycle);
 	free(cycle);
 }
 
@@ -397,12 +392,12 @@ static bool _isLevelAttribute(const char * name) {
  */
 static void _validateLevel(const SymbolTable * table, const Attribute * attribute) {
 	if (attribute->values->next != NULL) {
-		_reportSemanticError(attribute->position, "'%s' lleva un solo nivel.", attribute->name);
+		reportSemanticError(attribute->position, "'%s' lleva un solo nivel.", attribute->name);
 		return;
 	}
 	const Expression * value = attribute->values->expression;
 	if (value->type != FACTOR_EXPRESSION || value->factor->type != VARIABLE_FACTOR) {
-		_reportSemanticError(attribute->position,
+		reportSemanticError(attribute->position,
 			"'%s' lleva el nombre de un nivel de una escala (por ejemplo, 'alto').", attribute->name);
 		return;
 	}
@@ -411,11 +406,11 @@ static void _validateLevel(const SymbolTable * table, const Attribute * attribut
 		return;
 	}
 	if (findSymbol(table, SCALE_SYMBOL, factor->variable) != NULL) {
-		_reportSemanticError(factor->position,
+		reportSemanticError(factor->position,
 			"'%s' es una escala, pero '%s' lleva uno de sus niveles.", factor->variable, attribute->name);
 	}
 	else {
-		_reportSemanticError(factor->position,
+		reportSemanticError(factor->position,
 			"el nivel '%s' no está declarado en ninguna escala.", factor->variable);
 	}
 }
@@ -449,7 +444,7 @@ static void _validateNestedTopics(const MemberList * members) {
 		if (node->member->type == TOPIC_MEMBER) {
 			const Topic * topic = node->member->topic;
 			if (topic->goal != NULL) {
-				_reportSemanticError(topic->goalPosition,
+				reportSemanticError(topic->goalPosition,
 					"el tema '%s' está dentro de otro bloque, así que ya pertenece a su objetivo y no lleva 'in'.",
 					topic->name);
 			}
@@ -475,16 +470,16 @@ static void _validateRequirements(const SymbolTable * table) {
 			for (const ExpressionList * value = attribute->values; value != NULL; value = value->next) {
 				const Expression * expression = value->expression;
 				if (expression->type != FACTOR_EXPRESSION || expression->factor->type != VARIABLE_FACTOR) {
-					_reportSemanticError(attribute->position, "'requires' lleva nombres de temas, separados por comas.");
+					reportSemanticError(attribute->position, "'requires' lleva nombres de temas, separados por comas.");
 					break;
 				}
 				const Factor * factor = expression->factor;
 				const Symbol * required = findSymbol(table, TOPIC_SYMBOL, factor->variable);
 				if (required == NULL) {
-					_reportSemanticError(factor->position, "el tema '%s' no está declarado.", factor->variable);
+					reportSemanticError(factor->position, "el tema '%s' no está declarado.", factor->variable);
 				}
 				else if (required->kind == GOAL_SYMBOL) {
-					_reportSemanticError(factor->position, "'%s' es un objetivo, pero 'requires' lleva temas.", factor->variable);
+					reportSemanticError(factor->position, "'%s' es un objetivo, pero 'requires' lleva temas.", factor->variable);
 				}
 			}
 		}
@@ -501,18 +496,18 @@ static Symbol * _declare(SymbolTable * table, const SymbolKind kind, const char 
 		return addSymbol(table, kind, name, position);
 	}
 	if (previous->kind != kind) {
-		_reportSemanticError(position,
+		reportSemanticError(position,
 			"ya hay %s llamado '%s' %s; los objetivos y los temas no pueden compartir nombre.",
-			(previous->kind == GOAL_SYMBOL) ? "un objetivo" : "un tema", name, _describe(previous->position));
+			(previous->kind == GOAL_SYMBOL) ? "un objetivo" : "un tema", name, describePosition(previous->position));
 	}
 	else if (kind == GOAL_SYMBOL) {
-		_reportSemanticError(position, "el objetivo '%s' ya está declarado %s.", name, _describe(previous->position));
+		reportSemanticError(position, "el objetivo '%s' ya está declarado %s.", name, describePosition(previous->position));
 	}
 	else if (kind == TOPIC_SYMBOL) {
-		_reportSemanticError(position, "el tema '%s' ya está declarado %s.", name, _describe(previous->position));
+		reportSemanticError(position, "el tema '%s' ya está declarado %s.", name, describePosition(previous->position));
 	}
 	else {
-		_reportSemanticError(position, "la escala '%s' ya está declarada %s.", name, _describe(previous->position));
+		reportSemanticError(position, "la escala '%s' ya está declarada %s.", name, describePosition(previous->position));
 	}
 	return addSymbol(table, kind, name, position);
 }
@@ -541,13 +536,13 @@ static void _declareScale(SymbolTable * table, const Scale * scale) {
 	for (const LevelList * node = scale->levels; node != NULL; node = node->next) {
 		const Symbol * previous = findSymbol(table, LEVEL_SYMBOL, node->level);
 		if (previous != NULL && previous->owner == symbol) {
-			_reportSemanticError(node->position,
+			reportSemanticError(node->position,
 				"el nivel '%s' está repetido en la escala '%s'.", node->level, scale->name);
 		}
 		else if (previous != NULL) {
-			_reportSemanticError(node->position,
+			reportSemanticError(node->position,
 				"el nivel '%s' ya pertenece a la escala '%s' (%s); cada nivel pertenece a una sola escala.",
-				node->level, previous->owner->name, _describe(previous->position));
+				node->level, previous->owner->name, describePosition(previous->position));
 		}
 		Symbol * level = addSymbol(table, LEVEL_SYMBOL, node->level, node->position);
 		level->owner = symbol;
@@ -603,22 +598,6 @@ static void _declareTopic(SymbolTable * table, const Topic * topic, Symbol * goa
 }
 
 /**
- * Describes where something was declared, to point at it from a message
- * (e.g., "en la línea 3", or "en <metodos> (línea 3)"). The description is
- * overwritten by the next call, so it's used only once per message.
- */
-static const char * _describe(const Position position) {
-	static char description[256];
-	if (position.file != NULL) {
-		snprintf(description, sizeof(description), "en %s (línea %d)", position.file, position.line);
-	}
-	else {
-		snprintf(description, sizeof(description), "en la línea %d", position.line);
-	}
-	return description;
-}
-
-/**
  * Finds a method with the same name, declared before the specified one. The
  * libraries are included in place, so "before" follows the order in which
  * the declarations are read.
@@ -652,26 +631,6 @@ static Symbol * _findTopicSymbol(const SymbolTable * table, const Topic * topic)
 }
 
 /**
- * Reports a semantic error to the user, in the standard error output and with
- * the file (only when it isn't the main program) and the position of the
- * symbol that causes it.
- */
-static void _reportSemanticError(const Position position, const char * const format, ...) {
-	if (position.file != NULL) {
-		fprintf(stderr, "Error semántico en %s (%d:%d): ", position.file, position.line, position.column);
-	}
-	else {
-		fprintf(stderr, "Error semántico (%d:%d): ", position.line, position.column);
-	}
-	va_list arguments;
-	va_start(arguments, format);
-	vfprintf(stderr, format, arguments);
-	va_end(arguments);
-	fprintf(stderr, "\n");
-	++_errors;
-}
-
-/**
  * A block that describes the whole plan (e.g., "plan" or "availability") is
  * declared only once, because two of them would contradict each other.
  */
@@ -680,8 +639,8 @@ static void _validateUniqueBlock(const Declaration ** first, const Declaration *
 		*first = declaration;
 	}
 	else {
-		_reportSemanticError(declaration->position,
-			"ya hay un bloque '%s' %s; se declara una sola vez.", keyword, _describe((*first)->position));
+		reportSemanticError(declaration->position,
+			"ya hay un bloque '%s' %s; se declara una sola vez.", keyword, describePosition((*first)->position));
 	}
 }
 
@@ -700,7 +659,7 @@ static void _validateMethod(const DeclarationList * declarations, const Method *
  */
 static void _validateMethodName(const DeclarationList * declarations, const Method * method) {
 	if (!isupper((unsigned char) method->name[0])) {
-		_reportSemanticError(method->position,
+		reportSemanticError(method->position,
 			"el método '%s' tiene que empezar con mayúscula (por ejemplo, '%c%s').",
 			method->name, toupper((unsigned char) method->name[0]), method->name + 1);
 	}
@@ -709,22 +668,22 @@ static void _validateMethodName(const DeclarationList * declarations, const Meth
 		return;
 	}
 	if (previous->position.file != NULL && method->position.file == NULL) {
-		_reportSemanticError(method->position,
+		reportSemanticError(method->position,
 			"'%s' ya está definido en %s y no se puede redefinir; se personaliza con sus argumentos.",
 			method->name, previous->position.file);
 	}
 	else if (previous->position.file == NULL && method->position.file != NULL) {
-		_reportSemanticError(previous->position,
+		reportSemanticError(previous->position,
 			"'%s' ya está definido en %s y no se puede redefinir; se personaliza con sus argumentos.",
 			method->name, method->position.file);
 	}
 	else if (previous->position.file != NULL) {
-		_reportSemanticError(method->position,
+		reportSemanticError(method->position,
 			"el método '%s' ya está declarado en %s (línea %d).",
 			method->name, previous->position.file, previous->position.line);
 	}
 	else {
-		_reportSemanticError(method->position,
+		reportSemanticError(method->position,
 			"el método '%s' ya está declarado en la línea %d.",
 			method->name, previous->position.line);
 	}
@@ -742,7 +701,7 @@ static void _validateParameters(const Method * method) {
 		const Parameter * parameter = node->parameter;
 		for (const ParameterList * other = method->parameters; other != node; other = other->next) {
 			if (strcmp(other->parameter->name, parameter->name) == 0) {
-				_reportSemanticError(parameter->position,
+				reportSemanticError(parameter->position,
 					"el parámetro '%s' está repetido en el método '%s'.",
 					parameter->name, method->name);
 				break;
@@ -752,7 +711,7 @@ static void _validateParameters(const Method * method) {
 			hasDefaultValue = true;
 		}
 		else if (hasDefaultValue) {
-			_reportSemanticError(parameter->position,
+			reportSemanticError(parameter->position,
 				"el parámetro '%s' necesita un valor por defecto, porque está después de uno que lo tiene.",
 				parameter->name);
 		}
@@ -763,7 +722,7 @@ static void _validateParameters(const Method * method) {
 
 CompilationStatus executeSemanticAnalysis(Program * program) {
 	logDebugging(_logger, "Analyzing...");
-	_errors = 0;
+	resetSemanticErrors();
 	SymbolTable * table = createSymbolTable();
 	_declareSymbols(table, program->declarations);
 	_resolveGoals(table, program->declarations);
@@ -777,6 +736,7 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 		}
 	}
 	destroySymbolTable(table);
-	logDebugging(_logger, "Analysis is done (errors=%u).", _errors);
-	return (_errors == 0) ? SUCCEEDED : FAILED;
+	const unsigned int errors = semanticErrorCount();
+	logDebugging(_logger, "Analysis is done (errors=%u).", errors);
+	return (errors == 0) ? SUCCEEDED : FAILED;
 }

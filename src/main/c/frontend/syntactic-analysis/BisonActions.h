@@ -36,9 +36,9 @@ Factor * ParenthesizedFactorSemanticAction(Expression * expression, Position pos
 Factor * VariableFactorSemanticAction(char * variable, Position position);
 Factor * QuantifierFactorSemanticAction(const char * quantifier, Position position);
 
-Expression * BinaryExpressionSemanticAction(Expression * leftExpression, Expression * rightExpression, ExpressionType type);
-Expression * FactorExpressionSemanticAction(Factor * factor);
-Expression * UnaryExpressionSemanticAction(Expression * operand, ExpressionType type);
+Expression * BinaryExpressionSemanticAction(Expression * leftExpression, Expression * rightExpression, ExpressionType type, Position position);
+Expression * FactorExpressionSemanticAction(Factor * factor, Position position);
+Expression * UnaryExpressionSemanticAction(Expression * operand, ExpressionType type, Position position);
 
 ExpressionList * ExpressionListSemanticAction(ExpressionList * list, Expression * expression);
 ExpressionList * SingletonExpressionListSemanticAction(Expression * expression);

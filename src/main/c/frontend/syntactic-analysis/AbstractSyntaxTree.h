@@ -187,6 +187,8 @@ struct Expression {
 		};
 	};
 	ExpressionType type;
+	/** Where the operator is written, or where the factor starts. */
+	Position position;
 };
 
 struct ExpressionList {

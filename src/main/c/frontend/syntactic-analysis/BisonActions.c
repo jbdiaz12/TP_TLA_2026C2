@@ -157,28 +157,31 @@ Factor * QuantifierFactorSemanticAction(const char * quantifier, Position positi
 
 /** Expressions. */
 
-Expression * BinaryExpressionSemanticAction(Expression * leftExpression, Expression * rightExpression, ExpressionType type) {
+Expression * BinaryExpressionSemanticAction(Expression * leftExpression, Expression * rightExpression, ExpressionType type, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Expression * expression = calloc(1, sizeof(Expression));
 	expression->leftExpression = leftExpression;
 	expression->rightExpression = rightExpression;
 	expression->type = type;
+	expression->position = position;
 	return expression;
 }
 
-Expression * FactorExpressionSemanticAction(Factor * factor) {
+Expression * FactorExpressionSemanticAction(Factor * factor, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Expression * expression = calloc(1, sizeof(Expression));
 	expression->factor = factor;
 	expression->type = FACTOR_EXPRESSION;
+	expression->position = position;
 	return expression;
 }
 
-Expression * UnaryExpressionSemanticAction(Expression * operand, ExpressionType type) {
+Expression * UnaryExpressionSemanticAction(Expression * operand, ExpressionType type, Position position) {
 	_logSyntacticAnalyzerAction(__FUNCTION__);
 	Expression * expression = calloc(1, sizeof(Expression));
 	expression->operand = operand;
 	expression->type = type;
+	expression->position = position;
 	return expression;
 }
 
