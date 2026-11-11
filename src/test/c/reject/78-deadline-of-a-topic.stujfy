@@ -1,0 +1,2 @@
+goal TLA { topic A { } }
+constraints { deadline(A) <= 2026-12-01; }

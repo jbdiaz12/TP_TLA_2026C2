@@ -64,6 +64,7 @@ static void _reportCycle(const Symbol ** path, const int depth, const Symbol * r
 static void _validateAttributes(const Attribute ** attributes, const int count, const char * const * allowed, const char * owner);
 static void _validateAvailability(const Availability * availability);
 static void _validateBlocks(const SymbolTable * table, const DeclarationList * declarations);
+static void _validateConstraints(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateCycles(const SymbolTable * table);
 static void _validateMemberAttributes(const MemberList * members, const char * const * allowed, const char * owner);
 static void _validatePlanAttributes(const AttributeList * list);
@@ -312,6 +313,31 @@ static void _reportCycle(const Symbol ** path, const int depth, const Symbol * r
 	strcat(cycle, required->name);
 	reportSemanticError(position, "las dependencias forman un ciclo: %s.", cycle);
 	free(cycle);
+}
+
+/**
+ * Every constraint is a condition over the resulting schedule, written with
+ * the functions of the domain (e.g., "load(week) <= 20h").
+ */
+static void _validateConstraints(const SymbolTable * table, const DeclarationList * declarations) {
+	const Scope scope = {
+		.table = table,
+		.variables = NULL,
+		.variableCount = 0,
+		.allowsDomainFunctions = true
+	};
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		if (node->declaration->type != CONSTRAINTS_DECLARATION) {
+			continue;
+		}
+		for (const ConstraintList * constraint = node->declaration->constraints; constraint != NULL; constraint = constraint->next) {
+			const Type type = typeOf(constraint->constraint, &scope);
+			if (type.kind != ERROR_TYPE && type.kind != BOOLEAN_TYPE) {
+				reportSemanticError(constraint->constraint->position,
+					"una restricción es una condición (por ejemplo, 'load(week) <= 20h'), pero esta es %s.", describeType(type));
+			}
+		}
+	}
 }
 
 /**
@@ -730,6 +756,7 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_validateLevels(table);
 	_validateCycles(table);
 	_validateBlocks(table, program->declarations);
+	_validateConstraints(table, program->declarations);
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(program->declarations, node->declaration->method);

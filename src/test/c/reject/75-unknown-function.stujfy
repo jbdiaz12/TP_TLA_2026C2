@@ -1,0 +1,1 @@
+constraints { horas(week) <= 20h; }

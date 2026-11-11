@@ -36,6 +36,7 @@ if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
 		src/main/c/backend/semantic-analysis/SemanticAnalysis.c
 		src/main/c/backend/semantic-analysis/SemanticError.c
 		src/main/c/backend/semantic-analysis/SymbolTable.c
+		src/main/c/backend/semantic-analysis/TypeChecking.c
 		src/main/c/EntryPoint.c
 		src/main/c/frontend/Frontend.c
 		src/main/c/frontend/lexical-analysis/FlexActions.c

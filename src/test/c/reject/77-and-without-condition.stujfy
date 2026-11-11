@@ -1,0 +1,1 @@
+constraints { load(week) <= 20h and 3; }

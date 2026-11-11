@@ -1,0 +1,2 @@
+goal TLA { }
+constraints { finish(TLA) <= deadline(TLA) - 7d; }

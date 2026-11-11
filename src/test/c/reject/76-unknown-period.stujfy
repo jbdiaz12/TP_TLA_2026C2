@@ -1,0 +1,1 @@
+constraints { load(month) <= 20h; }

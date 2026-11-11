@@ -7,6 +7,7 @@
 #include "../../support/type/ModuleDestructor.h"
 #include "SemanticError.h"
 #include "SymbolTable.h"
+#include "TypeChecking.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
