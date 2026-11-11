@@ -41,6 +41,12 @@ const char * weekdayName(const int weekday) {
 	return names[weekday];
 }
 
+const char * monthName(const int month) {
+	static const char * const names[] = { "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+		"agosto", "septiembre", "octubre", "noviembre", "diciembre" };
+	return names[month - 1];
+}
+
 void formatDate(const int date, char * buffer) {
 	sprintf(buffer, "%04d-%02d-%02d", date / 10000, (date / 100) % 100, date % 100);
 }

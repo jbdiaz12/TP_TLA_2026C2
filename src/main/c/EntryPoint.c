@@ -45,7 +45,7 @@ const int main(const int length, const char ** arguments) {
 			if (compilationStatus == SUCCEEDED) {
 				logInformation(logger, "The planning phase schedules the input program.");
 				if (schedule != NULL) {
-					compilationStatus = executeGenerator(schedule);
+					compilationStatus = executeGenerator(schedule, symbolTable);
 					if (compilationStatus == SUCCEEDED) {
 						logInformation(logger, "The code-generation phase writes the output files.");
 					}

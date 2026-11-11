@@ -34,6 +34,14 @@ void destroySchedule(Schedule * schedule) {
 	}
 }
 
+int lastOfBlock(const Schedule * schedule, const int first) {
+	int last = first;
+	while (last + 1 < schedule->count && schedule->entries[last + 1].block == schedule->entries[first].block) {
+		++last;
+	}
+	return last;
+}
+
 void sortSchedule(Schedule * schedule) {
 	qsort(schedule->entries, schedule->count, sizeof(Entry), _compareEntries);
 }

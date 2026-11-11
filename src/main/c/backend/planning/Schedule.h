@@ -42,6 +42,12 @@ Schedule * createSchedule();
 /** Destroys a schedule (but not the symbols its entries point to). */
 void destroySchedule(Schedule * schedule);
 
+/**
+ * The index of the last entry of the block that starts at an entry. In a
+ * sorted schedule, the entries of a block are consecutive.
+ */
+int lastOfBlock(const Schedule * schedule, const int first);
+
 /** Sorts the entries of a schedule chronologically. */
 void sortSchedule(Schedule * schedule);
 

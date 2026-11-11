@@ -191,13 +191,11 @@ bool generateICalendar(const Schedule * schedule, const char * path) {
 	_writeProperty(file, "CALSCALE", "GREGORIAN");
 	_writeProperty(file, "METHOD", "PUBLISH");
 	_writeProperty(file, "X-WR-CALNAME", "Plan de estudio");
-	for (int k = 0; k < schedule->count;) {
-		Event event = { .first = &schedule->entries[k] };
-		while (k + 1 < schedule->count && schedule->entries[k + 1].block == event.first->block) {
-			++k;
-		}
-		event.last = &schedule->entries[k++];
+	for (int k = 0; k < schedule->count; ++k) {
+		const int last = lastOfBlock(schedule, k);
+		const Event event = { .first = &schedule->entries[k], .last = &schedule->entries[last] };
 		_writeEvent(file, &event, stamp);
+		k = last;
 	}
 	fprintf(file, "END:VCALENDAR\r\n");
 	return fclose(file) == 0;

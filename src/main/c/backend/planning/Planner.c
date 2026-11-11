@@ -188,8 +188,14 @@ static void _printSummary(const Schedule * schedule, const Work * works, const i
 		formatDate(toDate(lastDay), last);
 		formatDate(toDate(urgencies[k].deadline), deadline);
 		formatDuration(topicStudy, studyText);
-		printf("  %-*s  %3d sesiones (%s), del %s al %s; límite: %s.\n",
-			width, works[k].topic->name, topicSessions, studyText, first, last, deadline);
+		printf("  %-*s  %3d %s (%s), ", width, works[k].topic->name, topicSessions,
+			(topicSessions == 1) ? "sesión" : "sesiones", studyText);
+		if (firstDay == lastDay) {
+			printf("el %s; límite: %s.\n", first, deadline);
+		}
+		else {
+			printf("del %s al %s; límite: %s.\n", first, last, deadline);
+		}
 	}
 }
 

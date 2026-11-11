@@ -6,6 +6,8 @@
 #include "../../support/type/CompilationStatus.h"
 #include "../../support/type/ModuleDestructor.h"
 #include "../planning/Schedule.h"
+#include "../semantic-analysis/SymbolTable.h"
+#include "Html.h"
 #include "ICalendar.h"
 #include <errno.h>
 #include <stdio.h>
@@ -16,8 +18,9 @@ ModuleDestructor initializeGeneratorModule();
 
 /**
  * Writes the artifacts of a schedule in the output folder ("out", or the one
- * in the variable STUJFY_OUTPUT_PATH): the calendar "plan.ics".
+ * in the variable STUJFY_OUTPUT_PATH): the page "plan.html", and the
+ * calendar "plan.ics".
  */
-CompilationStatus executeGenerator(const Schedule * schedule);
+CompilationStatus executeGenerator(const Schedule * schedule, const SymbolTable * table);
 
 #endif

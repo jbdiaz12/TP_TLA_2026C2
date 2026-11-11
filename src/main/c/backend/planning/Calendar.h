@@ -28,6 +28,9 @@ int weekdayOf(const int dayNumber);
 /** The name of a day of the week, for the messages (e.g., "viernes"). */
 const char * weekdayName(const int weekday);
 
+/** The name of a month, from 1 (january) to 12 (december), e.g., "septiembre". */
+const char * monthName(const int month);
+
 /** Writes a date as "yyyy-mm-dd", in a buffer of at least 11 characters. */
 void formatDate(const int date, char * buffer);
 

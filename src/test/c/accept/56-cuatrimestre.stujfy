@@ -1,0 +1,56 @@
+// Un cuatrimestre con dos materias: muestra la página y el calendario generados.
+include <metodos>
+
+scale dificultad { baja < media < alta }
+scale importancia { normal < urgente }
+
+goal TLA {
+    description: "Teoría de Lenguajes y Autómatas: segundo parcial.";
+    due: 2026-10-30;
+    priority: urgente;
+
+    topic Automatas {
+        description: "AFD, AFND y minimización.";
+        difficulty: media;
+        estimated: 4h;
+    }
+
+    topic Gramaticas {
+        requires: Automatas;
+        difficulty: alta;
+
+        topic LL1 { estimated: 2h; }
+        topic LR  { requires: LL1; estimated: 2h; }
+    }
+}
+
+goal Fisica {
+    description: "Física II: final.";
+    due: 2026-11-20;
+    priority: normal;
+
+    topic Electrostatica { difficulty: media; estimated: 3h; method: ActiveRecall(); }
+    topic Circuitos { requires: Electrostatica; difficulty: baja; estimated: 2h; }
+    topic Consulta { description: "Clase de consulta con el docente."; estimated: 1h30m; fixed: 2026-09-10, 18:00, 1h30m; }
+}
+
+availability {
+    weekdays: 18:00 .. 21:00;
+    saturday: 10:00 .. 13:00;
+}
+
+constraints {
+    topics(day) <= 2;
+    load(week) <= 10h;
+    finish(goal) <= deadline(goal) - 7d;
+}
+
+rules {
+    when difficulty >= alta -> Espaciado();
+    otherwise               -> Pomodoro();
+}
+
+plan {
+    from: 2026-09-01;
+    strategy: priorityFirst;
+}

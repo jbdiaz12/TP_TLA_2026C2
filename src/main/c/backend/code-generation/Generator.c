@@ -30,20 +30,26 @@ static void _reportGenerationError(const char * path) {
 
 /* PUBLIC FUNCTIONS */
 
-CompilationStatus executeGenerator(const Schedule * schedule) {
+CompilationStatus executeGenerator(const Schedule * schedule, const SymbolTable * table) {
 	logDebugging(_logger, "Generating...");
 	const char * folder = getStringOrDefault("STUJFY_OUTPUT_PATH", "out");
 	if (mkdir(folder, 0755) != 0 && errno != EEXIST) {
 		_reportGenerationError(folder);
 		return FAILED;
 	}
-	char path[MAXIMUM_PATH_LENGTH];
-	snprintf(path, sizeof(path), "%s/plan.ics", folder);
-	if (!generateICalendar(schedule, path)) {
-		_reportGenerationError(path);
+	char page[MAXIMUM_PATH_LENGTH];
+	snprintf(page, sizeof(page), "%s/plan.html", folder);
+	if (!generateHtml(schedule, table, page)) {
+		_reportGenerationError(page);
 		return FAILED;
 	}
-	printf("Generé el calendario '%s'.\n", path);
+	char calendar[MAXIMUM_PATH_LENGTH];
+	snprintf(calendar, sizeof(calendar), "%s/plan.ics", folder);
+	if (!generateICalendar(schedule, calendar)) {
+		_reportGenerationError(calendar);
+		return FAILED;
+	}
+	printf("Generé la página '%s' y el calendario '%s'.\n", page, calendar);
 	logDebugging(_logger, "Generation is done.");
 	return SUCCEEDED;
 }
