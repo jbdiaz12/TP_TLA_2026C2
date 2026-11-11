@@ -7,6 +7,7 @@ void destroyWorks(Work * works, const int count) {
 				free(works[k].blocks[b].steps);
 			}
 			free(works[k].blocks);
+		free(works[k].excludedDays);
 		}
 		free(works);
 	}

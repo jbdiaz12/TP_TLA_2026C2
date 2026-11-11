@@ -68,7 +68,9 @@ static void _appendStep(Pattern * pattern, const int duration, const bool isSess
 static void _bind(Environment * environment, const Binding binding);
 static bool _bindArguments(const Method * method, const Factor * invocation, Environment * environment);
 static const Expression * _chooseMethod(const SymbolTable * table, const DeclarationList * declarations, const Symbol * topic, const int estimated);
+static bool _buildPattern(Work * work, const SymbolTable * table, const DeclarationList * declarations, const int implicitSession, Pattern * pattern);
 static void _cover(Work * work, Pattern * pattern, const int minutes);
+static void _coverDay(Work * work, const Pattern * pattern, const int minutes);
 static void _destroyEnvironment(Environment * environment);
 static void _destroyPattern(Pattern * pattern);
 static bool _evaluateList(const Expression * expression, const Environment * environment, int ** items, int * count);
@@ -76,6 +78,8 @@ static bool _evaluateNumber(const Expression * expression, const Environment * e
 static void _execute(const StatementList * statements, Environment * environment, Pattern * pattern, const Invocation * invocation);
 static void _executeStatement(const Statement * statement, Environment * environment, Pattern * pattern, const Invocation * invocation);
 static void _expand(Work * work, const SymbolTable * table, const DeclarationList * declarations, const int minutes);
+static void _expandDaily(Work * work, const SymbolTable * table, const DeclarationList * declarations);
+static void _readExceptions(Work * work);
 static const Attribute * _findAttribute(const MemberList * members, const char * name);
 static const Binding * _findBinding(const Environment * environment, const char * name);
 static const Method * _findMethod(const DeclarationList * declarations, const char * name);
@@ -200,6 +204,39 @@ static void _cover(Work * work, Pattern * pattern, const int minutes) {
 			work->blocks[work->blockCount++] = block;
 		}
 	}
+}
+
+/**
+ * Joins the steps of a pattern, repeating them, until its sessions cover the
+ * minutes of a day, in a single block. The last session is cut where the
+ * time is covered, and the pauses that end the block are discarded.
+ */
+static void _coverDay(Work * work, const Pattern * pattern, const int minutes) {
+	Block block = { 0 };
+	int remaining = minutes;
+	for (int repetition = 0; 0 < remaining && repetition < MAXIMUM_REPETITIONS; ++repetition) {
+		for (int k = 0; k < pattern->count && 0 < remaining; ++k) {
+			for (int s = 0; s < pattern->blocks[k].stepCount && 0 < remaining; ++s) {
+				Step step = pattern->blocks[k].steps[s];
+				if (step.isSession) {
+					if (remaining < step.duration) {
+						step.duration = remaining;
+					}
+					remaining -= step.duration;
+					block.study += step.duration;
+				}
+				block.steps = realloc(block.steps, (block.stepCount + 1) * sizeof(Step));
+				block.steps[block.stepCount++] = step;
+				block.length += step.duration;
+			}
+		}
+	}
+	while (0 < block.stepCount && !block.steps[block.stepCount - 1].isSession) {
+		block.length -= block.steps[--block.stepCount].duration;
+	}
+	work->blocks = calloc(1, sizeof(Block));
+	work->blocks[0] = block;
+	work->blockCount = 1;
 }
 
 static void _destroyEnvironment(Environment * environment) {
@@ -360,18 +397,19 @@ static void _executeStatement(const Statement * statement, Environment * environ
 }
 
 /**
- * Builds the blocks of a topic: it runs its method once, as a pattern, and
- * repeats that pattern until it covers the minutes of the topic.
+ * Runs the method of a topic once, as a pattern of blocks sorted by their
+ * offsets. A topic without a method has a single session (of the specified
+ * minutes). It returns false, after reporting it, when the method fails or
+ * has no sessions.
  */
-static void _expand(Work * work, const SymbolTable * table, const DeclarationList * declarations, const int minutes) {
+static bool _buildPattern(Work * work, const SymbolTable * table, const DeclarationList * declarations, const int implicitSession, Pattern * pattern) {
 	const Symbol * topic = work->topic;
-	Pattern pattern = { 0 };
-	_openBlock(&pattern, 0);
+	_openBlock(pattern, 0);
 	const Expression * choice = _chooseMethod(table, declarations, topic, work->estimated);
 	Position position = topic->position;
 	if (choice == NULL) {
 		const Invocation implicit = { .method = "Bloque", .topic = topic->name, .position = position };
-		_appendStep(&pattern, IMPLICIT_SESSION, true, &implicit);
+		_appendStep(pattern, implicitSession, true, &implicit);
 	}
 	else {
 		const Factor * factor = choice->factor;
@@ -381,36 +419,66 @@ static void _expand(Work * work, const SymbolTable * table, const DeclarationLis
 		work->method = method->name;
 		position = factor->position;
 		if (_bindArguments(method, factor, &environment)) {
-			_execute(method->body, &environment, &pattern, &invocation);
+			_execute(method->body, &environment, pattern, &invocation);
 		}
 		_destroyEnvironment(&environment);
 	}
-	if (pattern.hasFailed) {
-		_destroyPattern(&pattern);
-		return;
+	if (pattern->hasFailed) {
+		return false;
 	}
 	int study = 0;
-	for (int k = 0; k < pattern.count; ++k) {
-		for (int s = 0; s < pattern.blocks[k].stepCount; ++s) {
-			if (pattern.blocks[k].steps[s].isSession) {
-				study += pattern.blocks[k].steps[s].duration;
+	for (int k = 0; k < pattern->count; ++k) {
+		for (int s = 0; s < pattern->blocks[k].stepCount; ++s) {
+			if (pattern->blocks[k].steps[s].isSession) {
+				study += pattern->blocks[k].steps[s].duration;
 			}
 		}
 	}
 	if (study == 0) {
 		reportPlanningError(position,
 			"con estos argumentos, '%s' no tiene ninguna sesión, así que no puede cubrir el tema '%s'.", work->method, topic->name);
+		return false;
 	}
-	else {
-		for (int k = 1; k < pattern.count; ++k) {
-			const Block block = pattern.blocks[k];
-			int j = k - 1;
-			for (; 0 <= j && block.offset < pattern.blocks[j].offset; --j) {
-				pattern.blocks[j + 1] = pattern.blocks[j];
-			}
-			pattern.blocks[j + 1] = block;
+	for (int k = 1; k < pattern->count; ++k) {
+		const Block block = pattern->blocks[k];
+		int j = k - 1;
+		for (; 0 <= j && block.offset < pattern->blocks[j].offset; --j) {
+			pattern->blocks[j + 1] = pattern->blocks[j];
 		}
+		pattern->blocks[j + 1] = block;
+	}
+	return true;
+}
+
+/**
+ * Builds the blocks of a topic: it runs its method once, as a pattern, and
+ * repeats that pattern until it covers the minutes of the topic.
+ */
+static void _expand(Work * work, const SymbolTable * table, const DeclarationList * declarations, const int minutes) {
+	Pattern pattern = { 0 };
+	if (_buildPattern(work, table, declarations, IMPLICIT_SESSION, &pattern)) {
 		_cover(work, &pattern, minutes);
+	}
+	_destroyPattern(&pattern);
+}
+
+/**
+ * Builds the block that a topic with "daily" studies every day: its method
+ * repeated, in a single sitting, until it covers the minutes of a day. A
+ * method that spreads its sessions over several days ("after") doesn't fit
+ * in a single day, so it can't be used with "daily".
+ */
+static void _expandDaily(Work * work, const SymbolTable * table, const DeclarationList * declarations) {
+	Pattern pattern = { 0 };
+	if (_buildPattern(work, table, declarations, work->daily, &pattern)) {
+		if (0 < pattern.blocks[pattern.count - 1].offset) {
+			reportPlanningError(work->topic->position,
+				"el tema '%s' se estudia todos los días con 'daily', pero '%s' reparte sus sesiones en varios días con 'after'.",
+				work->topic->name, work->method);
+		}
+		else {
+			_coverDay(work, &pattern, work->daily);
+		}
 	}
 	_destroyPattern(&pattern);
 }
@@ -468,6 +536,48 @@ static const Attribute * _inheritedAttribute(const Symbol * topic, const char * 
 		}
 	}
 	return NULL;
+}
+
+/**
+ * Reads the days when a topic isn't studied: the "except" of the topic, of
+ * the topics that contain it, and of its goal.
+ */
+static void _readExceptions(Work * work) {
+	const Symbol * holders[64];
+	int holderCount = 0;
+	for (const Symbol * symbol = work->topic; symbol != NULL && holderCount < 63; symbol = symbol->parent) {
+		holders[holderCount++] = symbol;
+	}
+	holders[holderCount++] = work->topic->owner;
+	for (int h = 0; h < holderCount; ++h) {
+		const Symbol * holder = holders[h];
+		const MemberList * members = (holder->kind == GOAL_SYMBOL) ? holder->goal->members : holder->topic->members;
+		const Attribute * except = _findAttribute(members, "except");
+		if (except == NULL) {
+			continue;
+		}
+		for (const ExpressionList * node = except->values; node != NULL; node = node->next) {
+			const Factor * factor = node->expression->factor;
+			if (factor->type == CONSTANT_FACTOR) {
+				work->excludedDays = realloc(work->excludedDays, (work->excludedDayCount + 1) * sizeof(int));
+				work->excludedDays[work->excludedDayCount++] = toDayNumber(factor->constant->date);
+				continue;
+			}
+			const char * name = factor->variable;
+			for (int weekday = 0; weekday < DAYS_PER_WEEK; ++weekday) {
+				const bool isWeekend = (5 <= weekday);
+				if ((strcmp(name, "weekdays") == 0 && !isWeekend) || (strcmp(name, "weekend") == 0 && isWeekend)) {
+					work->excludedWeekdays[weekday] = true;
+				}
+			}
+			static const char * const names[] = { "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" };
+			for (int weekday = 0; weekday < DAYS_PER_WEEK; ++weekday) {
+				if (strcmp(name, names[weekday]) == 0) {
+					work->excludedWeekdays[weekday] = true;
+				}
+			}
+		}
+	}
 }
 
 /**
@@ -586,8 +696,22 @@ Work * expandWorks(const DeclarationList * declarations, const SymbolTable * tab
 		}
 		Work * work = &works[k++];
 		work->topic = symbol;
+		_readExceptions(work);
 		const Attribute * estimated = _findAttribute(symbol->topic->members, "estimated");
-		evaluateConstant(estimated->values->expression, &work->estimated);
+		if (estimated != NULL) {
+			evaluateConstant(estimated->values->expression, &work->estimated);
+		}
+		const Attribute * daily = _findAttribute(symbol->topic->members, "daily");
+		if (daily != NULL) {
+			evaluateConstant(daily->values->expression, &work->daily);
+			const Attribute * days = _findAttribute(symbol->topic->members, "days");
+			if (days != NULL) {
+				evaluateConstant(days->values->expression, &work->days);
+				work->estimated = work->days * work->daily;
+			}
+			_expandDaily(work, table, declarations);
+			continue;
+		}
 		int minutes = work->estimated;
 		const Attribute * fixed = _findAttribute(symbol->topic->members, "fixed");
 		if (fixed != NULL) {

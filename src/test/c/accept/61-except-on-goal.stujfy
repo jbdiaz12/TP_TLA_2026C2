@@ -1,0 +1,4 @@
+// Ningún tema de Logica se estudia el fin de semana, aunque haya disponibilidad.
+availability { every: 2h; }
+goal Logica { due: 2026-09-30; except: weekend; topic Teoria { estimated: 6h; } }
+plan { from: 2026-09-04; }

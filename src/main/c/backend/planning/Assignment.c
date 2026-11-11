@@ -17,6 +17,9 @@ typedef struct {
 	int prerequisiteCount;
 	/** Whether the work has a block that doesn't fit inside any window. */
 	bool isUnfit;
+	/** For a work with "daily": the days studied, and their minutes of study. */
+	int dailyDays;
+	int dailyStudy;
 } Progress;
 
 /** A block of a work that can be placed, and the earliest time when it can start. */
@@ -46,14 +49,45 @@ typedef struct {
 /* PRIVATE FUNCTIONS */
 
 static void _addPrerequisite(Progress * progress, const int work);
+static void _appendBlock(Schedule * schedule, const Work * work, const Block * block, const int day, const int start);
+static void _assignDaily(Schedule * schedule, const Work * works, const int count, Progress * progress, Usage * usage, Occupation * occupation,
+	const Urgency * urgencies, const DayAvailability * windows, const Settings * settings, const int day);
 static int _compareCandidates(const Candidate * first, const Candidate * second, const Urgency * urgencies, const bool isPriorityFirst);
 static bool _earliestOf(const Work * works, const Progress * progress, const int work, const int block, const int planStart, int * earliest);
 static bool _findStart(const DayAvailability * day, const Occupation * occupation, const int minimum, const int length, int * start);
 static int _firstOfRepetition(const Work * work, const int block);
 static bool _isDescendant(const Symbol * symbol, const Symbol * ancestor);
+static bool _isExcluded(const Work * work, const int day);
+static void _reportDailyShortage(const Work * work, const Progress * state, const Urgency * urgency, const Settings * settings);
 static bool _isWithinLimits(const Usage * usage, const int work, const int study, const Settings * settings);
 static void _occupy(Occupation * occupation, const int start, const int end);
 static void _place(Schedule * schedule, const Work * works, Progress * progress, Usage * usage, Occupation * occupation, const Candidate * candidate, const int day, const int start);
+/**
+ * Reports a work with "daily" that couldn't study all of its days, or all of
+ * its estimated time, before its deadline (or the end of the plan).
+ */
+static void _reportDailyShortage(const Work * work, const Progress * state, const Urgency * urgency, const Settings * settings) {
+	const int limit = (urgency->deadline < settings->lastDay) ? urgency->deadline : settings->lastDay;
+	char limitText[11];
+	formatDate(toDate(limit), limitText);
+	if (0 < work->days) {
+		reportPlanningError(work->topic->position,
+			"no alcanza el tiempo para el tema '%s': de sus %d días de 'daily', solo %d entran a más tardar el %s.",
+			work->topic->name, work->days, state->dailyDays, limitText);
+	}
+	else if (0 < work->estimated) {
+		char missingText[16];
+		formatDuration(work->estimated - state->dailyStudy, missingText);
+		reportPlanningError(work->topic->position,
+			"no alcanza el tiempo para el tema '%s': le %s %s de estudio para terminarlo a más tardar el %s.",
+			work->topic->name, (work->estimated - state->dailyStudy == 60) ? "falta" : "faltan", missingText, limitText);
+	}
+	else {
+		reportPlanningError(work->topic->position,
+			"el tema '%s' no tiene ningún día para estudiar con 'daily' antes del %s.", work->topic->name, limitText);
+	}
+}
+
 static void _resolvePrerequisites(const SymbolTable * table, const Work * works, const int count, Progress * progress);
 static void _use(Usage * usage, const int work, const int study);
 
@@ -65,6 +99,102 @@ static void _addPrerequisite(Progress * progress, const int work) {
 	}
 	progress->prerequisites = realloc(progress->prerequisites, (progress->prerequisiteCount + 1) * sizeof(int));
 	progress->prerequisites[progress->prerequisiteCount++] = work;
+}
+
+/** Adds the sessions and the pauses of a block to the schedule, as a new block. */
+static void _appendBlock(Schedule * schedule, const Work * work, const Block * block, const int day, const int start) {
+	const int number = schedule->blockCount++;
+	int cursor = start;
+	for (int s = 0; s < block->stepCount; ++s) {
+		appendEntry(schedule, (Entry) {
+			.topic = work->topic,
+			.method = work->method,
+			.day = day,
+			.start = cursor,
+			.duration = block->steps[s].duration,
+			.isSession = block->steps[s].isSession,
+			.isFixed = false,
+			.block = number
+		});
+		cursor += block->steps[s].duration;
+	}
+}
+
+/**
+ * Places the block of every work with "daily" on a day, before the rest of
+ * the works: like a fixed session, it's a commitment of that day. A day
+ * without availability, or excluded by "except", doesn't count. A work
+ * starts when the topics that it requires are finished, and on its last day
+ * it studies only what remains of its estimated time. A day that can't hold
+ * its block is reported, and the work isn't placed anymore.
+ */
+static void _assignDaily(Schedule * schedule, const Work * works, const int count, Progress * progress, Usage * usage, Occupation * occupation,
+		const Urgency * urgencies, const DayAvailability * windows, const Settings * settings, const int day) {
+	if (windows->count == 0) {
+		return;
+	}
+	for (int k = 0; k < count; ++k) {
+		const Work * work = &works[k];
+		Progress * state = &progress[k];
+		if (work->daily == 0 || work->blockCount == 0 || state->isComplete || state->isUnfit
+				|| urgencies[k].deadline < day || _isExcluded(work, day)) {
+			continue;
+		}
+		int minimum = 0;
+		bool isReady = true;
+		for (int p = 0; p < state->prerequisiteCount && isReady; ++p) {
+			const Progress * prerequisite = &progress[state->prerequisites[p]];
+			isReady = prerequisite->isComplete;
+			if (minimum < prerequisite->finish - (day * MINUTES_PER_DAY)) {
+				minimum = prerequisite->finish - (day * MINUTES_PER_DAY);
+			}
+		}
+		if (!isReady || MINUTES_PER_DAY <= minimum) {
+			continue;
+		}
+		const Block * unit = &work->blocks[0];
+		Block block = { .steps = calloc(unit->stepCount, sizeof(Step)) };
+		const bool isLimited = (work->days == 0 && 0 < work->estimated);
+		int remaining = isLimited ? (work->estimated - state->dailyStudy) : unit->study;
+		for (int s = 0; s < unit->stepCount && 0 < remaining; ++s) {
+			Step step = unit->steps[s];
+			if (step.isSession) {
+				step.duration = (remaining < step.duration) ? remaining : step.duration;
+				remaining -= step.duration;
+				block.study += step.duration;
+			}
+			block.steps[block.stepCount++] = step;
+			block.length += step.duration;
+		}
+		char dateText[11];
+		char studyText[16];
+		formatDate(toDate(day), dateText);
+		formatDuration(block.study, studyText);
+		int start = 0;
+		if (!_isWithinLimits(usage, k, block.study, settings)) {
+			reportPlanningError(work->topic->position,
+				"el tema '%s' no puede estudiar sus %s de 'daily' el %s %s sin pasarse de los límites de las restricciones.",
+				work->topic->name, studyText, weekdayName(weekdayOf(day)), dateText);
+			state->isUnfit = true;
+		}
+		else if (!_findStart(windows, occupation, (minimum < 0) ? 0 : minimum, block.length, &start)) {
+			reportPlanningError(work->topic->position,
+				"el tema '%s' no tiene lugar para sus %s de 'daily' el %s %s: no entran en la disponibilidad que queda ese día.",
+				work->topic->name, studyText, weekdayName(weekdayOf(day)), dateText);
+			state->isUnfit = true;
+		}
+		else {
+			_appendBlock(schedule, work, &block, day, start);
+			_occupy(occupation, start, start + block.length);
+			_use(usage, k, block.study);
+			state->finish = (day * MINUTES_PER_DAY) + start + block.length;
+			++state->dailyDays;
+			state->dailyStudy += block.study;
+			state->isComplete = (0 < work->days) ? (work->days <= state->dailyDays)
+				: (0 < work->estimated && work->estimated <= state->dailyStudy);
+		}
+		free(block.steps);
+	}
 }
 
 /**
@@ -180,6 +310,19 @@ static bool _isDescendant(const Symbol * symbol, const Symbol * ancestor) {
 	return false;
 }
 
+/** Whether a work isn't studied on a day, because of its "except". */
+static bool _isExcluded(const Work * work, const int day) {
+	if (work->excludedWeekdays[weekdayOf(day)]) {
+		return true;
+	}
+	for (int k = 0; k < work->excludedDayCount; ++k) {
+		if (work->excludedDays[k] == day) {
+			return true;
+		}
+	}
+	return false;
+}
+
 static bool _isWithinLimits(const Usage * usage, const int work, const int study, const Settings * settings) {
 	if (settings->loadPerDay - study < usage->dayLoad || settings->loadPerWeek - study < usage->weekLoad) {
 		return false;
@@ -206,21 +349,7 @@ static void _place(Schedule * schedule, const Work * works, Progress * progress,
 	const Work * work = &works[candidate->work];
 	const Block * block = &work->blocks[candidate->block];
 	Progress * state = &progress[candidate->work];
-	const int number = schedule->blockCount++;
-	int cursor = start;
-	for (int s = 0; s < block->stepCount; ++s) {
-		appendEntry(schedule, (Entry) {
-			.topic = work->topic,
-			.method = work->method,
-			.day = day,
-			.start = cursor,
-			.duration = block->steps[s].duration,
-			.isSession = block->steps[s].isSession,
-			.isFixed = false,
-			.block = number
-		});
-		cursor += block->steps[s].duration;
-	}
+	_appendBlock(schedule, work, block, day, start);
 	_occupy(occupation, start, start + block->length);
 	_use(usage, candidate->work, block->study);
 	state->starts[candidate->block] = (day * MINUTES_PER_DAY) + start;
@@ -353,12 +482,14 @@ Schedule * assignWorks(const SymbolTable * table, const Work * works, const int 
 			}
 		}
 		const DayAvailability * windows = &availability->days[weekday];
+		_assignDaily(schedule, works, count, progress, &usage, &occupation, urgencies, windows, settings, day);
 		bool hasPlaced = (0 < windows->count);
 		while (hasPlaced) {
 			hasPlaced = false;
 			int candidateCount = 0;
 			for (int k = 0; k < count; ++k) {
-				if (progress[k].isComplete || progress[k].isUnfit || urgencies[k].deadline < day) {
+				if (works[k].daily != 0 || progress[k].isComplete || progress[k].isUnfit
+						|| urgencies[k].deadline < day || _isExcluded(&works[k], day)) {
 					continue;
 				}
 				Candidate best = { .work = -1 };
@@ -392,6 +523,12 @@ Schedule * assignWorks(const SymbolTable * table, const Work * works, const int 
 	}
 	for (int k = 0; k < count; ++k) {
 		if (progress[k].isComplete || progress[k].isUnfit) {
+			continue;
+		}
+		if (works[k].daily != 0) {
+			if (0 < works[k].days || 0 < works[k].estimated || progress[k].dailyDays == 0) {
+				_reportDailyShortage(&works[k], &progress[k], &urgencies[k], settings);
+			}
 			continue;
 		}
 		int missing = 0;

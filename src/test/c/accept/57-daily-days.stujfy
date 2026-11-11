@@ -1,0 +1,4 @@
+// 1h por día durante 5 días, sin estudiar los domingos ni el 2026-09-03.
+availability { every: 2h; }
+goal TLA { due: 2026-09-30; topic A { daily: 1h; days: 5; except: sunday, 2026-09-03; } }
+plan { from: 2026-09-01; }

@@ -1,0 +1,9 @@
+// Practica empieza cuando termina Teoria, y TLA se estudia todos los días a la par.
+availability { every: 4h; }
+goal TLA { due: 2026-09-10; topic Estudio { daily: 1h; } }
+goal Logica {
+    due: 2026-09-12;
+    topic Teoria { daily: 1h; days: 2; }
+    topic Practica { requires: Teoria; estimated: 4h; }
+}
+plan { from: 2026-09-01; }

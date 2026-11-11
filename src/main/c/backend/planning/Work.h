@@ -2,6 +2,7 @@
 #define WORK_HEADER
 
 #include "../semantic-analysis/SymbolTable.h"
+#include "Calendar.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -54,6 +55,18 @@ typedef struct {
 	/** The blocks that cover the rest of the estimated time, in order. */
 	Block * blocks;
 	int blockCount;
+	/**
+	 * The minutes of study of every day, for a topic with "daily" (0
+	 * otherwise). Its only block is what it studies each day, and it's
+	 * studied during "days" days, until it covers its estimated time, or
+	 * (when it has neither) every day until its deadline.
+	 */
+	int daily;
+	int days;
+	/** The days when the topic isn't studied: days of the week, and dates (as day numbers). */
+	bool excludedWeekdays[DAYS_PER_WEEK];
+	int * excludedDays;
+	int excludedDayCount;
 } Work;
 
 /** Destroys a list of works and their blocks. */

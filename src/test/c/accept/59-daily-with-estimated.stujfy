@@ -1,0 +1,4 @@
+// 2h por día hasta juntar 5h: el último día estudia 1h.
+availability { every: 3h; }
+goal TLA { due: 2026-09-30; topic A { daily: 2h; estimated: 5h; } }
+plan { from: 2026-09-01; }

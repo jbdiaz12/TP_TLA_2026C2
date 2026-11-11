@@ -1,0 +1,5 @@
+// Cada día son 2h de pomodoros: el método arma el día.
+include <metodos>
+availability { every: 3h; }
+goal TLA { due: 2026-09-30; topic A { daily: 2h; days: 3; method: Pomodoro(); } }
+plan { from: 2026-09-01; }

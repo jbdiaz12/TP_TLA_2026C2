@@ -1,0 +1,4 @@
+// Del 1 al 5 de septiembre hay 5 días, pero 'days' pide 10.
+availability { every: 2h; }
+goal TLA { due: 2026-09-05; topic A { daily: 1h; days: 10; } }
+plan { from: 2026-09-01; }

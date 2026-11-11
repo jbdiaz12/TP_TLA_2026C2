@@ -1,0 +1,4 @@
+// Sin 'days' ni 'estimated', se estudia todos los días hasta la fecha límite.
+availability { weekdays: 2h; }
+goal TLA { due: 2026-09-11; topic A { daily: 45m; } }
+plan { from: 2026-09-01; }

@@ -1,0 +1,5 @@
+// 'daily' pide 2h por día, pero las restricciones permiten 1h.
+availability { every: 3h; }
+goal TLA { due: 2026-09-10; topic A { daily: 2h; days: 3; } }
+constraints { load(day) <= 1h; }
+plan { from: 2026-09-01; }

@@ -1,0 +1,4 @@
+// Los dos temas piden 1h30m por día, y cada día hay 2h.
+availability { every: 2h; }
+goal TLA { due: 2026-09-10; topic A { daily: 1h30m; days: 3; } topic B { daily: 1h30m; days: 3; } }
+plan { from: 2026-09-01; }
