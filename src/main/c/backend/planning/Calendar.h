@@ -28,6 +28,9 @@ const char * weekdayName(const int weekday);
 /** Writes a date as "yyyy-mm-dd", in a buffer of at least 11 characters. */
 void formatDate(const int date, char * buffer);
 
+/** Writes a duration as "18h", "1h30m" or "45m", in a buffer of at least 16 characters. */
+void formatDuration(const int minutes, char * buffer);
+
 /** Writes an amount of minutes since midnight as "hh:mm", in a buffer of at least 6 characters. */
 void formatTime(const int minutes, char * buffer);
 

@@ -30,8 +30,8 @@ goal TLA {
         difficulty: alto;
         estimated: 4h30m;
 
-        topic LL1 { estimated: 3h; }
-        topic LR  { requires: LL1; estimated: 5h; }
+        topic LL1 { estimated: 3h30m; }
+        topic LR  { requires: LL1; estimated: 1h; }
     }
 }
 

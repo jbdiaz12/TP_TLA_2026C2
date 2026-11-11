@@ -18,7 +18,7 @@ typedef struct {
 
 /** The attributes that every block admits, in alphabetical order. */
 static const char * const _GOAL_ATTRIBUTES[] = { "description", "due", "priority", NULL };
-static const char * const _PLAN_ATTRIBUTES[] = { "from", "strategy", "until", NULL };
+static const char * const _PLAN_ATTRIBUTES[] = { "from", "start", "strategy", "until", NULL };
 static const char * const _TOPIC_ATTRIBUTES[] = { "description", "difficulty", "estimated", "fixed", "method", "requires", NULL };
 
 /**
@@ -68,7 +68,16 @@ static void _validatePeriods(const Slot * slot, const Scope * scope);
 static void _validateBlocks(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateConstraints(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateCycles(const SymbolTable * table);
+static bool _estimatedOf(const Topic * topic, int * minutes);
+static const Attribute * _findAttribute(const MemberList * members, const char * name);
+static const Declaration * _findDeclaration(const DeclarationList * declarations, const DeclarationType type);
+static bool _hasSubtopics(const Topic * topic);
+static bool _isDateBound(const Expression * expression);
+static bool _isPlannable(const Expression * constraint);
+static int _planStart(const Declaration * plan);
+static void _validateEstimates(const DeclarationList * declarations);
 static void _validateFixedSessions(const SymbolTable * table, const DeclarationList * declarations);
+static void _validatePlanRequirements(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateInvocations(const SymbolTable * table, const DeclarationList * declarations);
 static const Symbol * _scaleOfAttribute(const SymbolTable * table, const SymbolKind kind, const char * name);
 static void _validateRules(const SymbolTable * table, const DeclarationList * declarations);
@@ -422,8 +431,9 @@ static void _validateValues(const Attribute * attribute, const Scope * scope) {
 	const bool isText = (strcmp(name, "description") == 0);
 	const bool isEstimation = (strcmp(name, "estimated") == 0);
 	const bool isEnd = (strcmp(name, "until") == 0);
+	const bool isStart = (strcmp(name, "start") == 0);
 	const bool isStrategy = (strcmp(name, "strategy") == 0);
-	if (!isDate && !isText && !isEstimation && !isEnd && !isStrategy) {
+	if (!isDate && !isText && !isEstimation && !isEnd && !isStrategy && !isStart) {
 		return;
 	}
 	const Expression * value = _singleValue(attribute);
@@ -444,6 +454,9 @@ static void _validateValues(const Attribute * attribute, const Scope * scope) {
 	}
 	else if (isText) {
 		_hasType(attribute, value, STRING_TYPE, scope);
+	}
+	else if (isStart) {
+		_hasType(attribute, value, TIME_TYPE, scope);
 	}
 	else if (_hasType(attribute, value, DURATION_TYPE, scope)) {
 		_validatePositiveDuration(attribute, value);
@@ -603,21 +616,229 @@ static void _validateConstraints(const SymbolTable * table, const DeclarationLis
 }
 
 /**
+ * The estimated time of a topic, if it's known: the declared one, or the sum
+ * of its subtopics when it contains them. A topic that contains others and
+ * also declares its estimated time states that sum, so both have to match.
+ */
+static bool _estimatedOf(const Topic * topic, int * minutes) {
+	const Attribute * declared = _findAttribute(topic->members, "estimated");
+	int declaredMinutes = 0;
+	const bool isDeclared = declared != NULL && evaluateConstant(declared->values->expression, &declaredMinutes);
+	if (!_hasSubtopics(topic)) {
+		*minutes = declaredMinutes;
+		return isDeclared;
+	}
+	bool isKnown = true;
+	int sum = 0;
+	for (const MemberList * node = topic->members; node != NULL; node = node->next) {
+		if (node->member->type == TOPIC_MEMBER) {
+			int subtopicMinutes = 0;
+			if (_estimatedOf(node->member->topic, &subtopicMinutes)) {
+				sum += subtopicMinutes;
+			}
+			else {
+				isKnown = false;
+			}
+		}
+	}
+	if (isDeclared && isKnown && sum != declaredMinutes) {
+		char declaredText[16];
+		char sumText[16];
+		formatDuration(declaredMinutes, declaredText);
+		formatDuration(sum, sumText);
+		reportSemanticError(declared->position,
+			"'%s' estima %s, pero sus subtemas suman %s.", topic->name, declaredText, sumText);
+	}
+	*minutes = sum;
+	return isKnown;
+}
+
+/**
+ * Finds the first attribute of a goal or a topic with a name, or NULL.
+ */
+static const Attribute * _findAttribute(const MemberList * members, const char * name) {
+	for (const MemberList * node = members; node != NULL; node = node->next) {
+		if (node->member->type == ATTRIBUTE_MEMBER && strcmp(node->member->attribute->name, name) == 0) {
+			return node->member->attribute;
+		}
+	}
+	return NULL;
+}
+
+/**
+ * Finds the first declaration of a kind, or NULL.
+ */
+static const Declaration * _findDeclaration(const DeclarationList * declarations, const DeclarationType type) {
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		if (node->declaration->type == type) {
+			return node->declaration;
+		}
+	}
+	return NULL;
+}
+
+static bool _hasSubtopics(const Topic * topic) {
+	for (const MemberList * node = topic->members; node != NULL; node = node->next) {
+		if (node->member->type == TOPIC_MEMBER) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Whether an expression is a date that the planner can compute: a date, or
+ * the deadline of a goal, moved by constant durations (e.g., "deadline(goal)
+ * - 7d").
+ */
+static bool _isDateBound(const Expression * expression) {
+	if (expression->type == FACTOR_EXPRESSION) {
+		const Factor * factor = expression->factor;
+		if (factor->type == PARENTHESIZED_FACTOR) {
+			return _isDateBound(factor->expression);
+		}
+		return (factor->type == CONSTANT_FACTOR && factor->constant->type == DATE_CONSTANT)
+			|| (factor->type == INVOCATION_FACTOR && strcmp(factor->function, "deadline") == 0);
+	}
+	int minutes = 0;
+	return (expression->type == ARITHMETIC_ADD || expression->type == ARITHMETIC_SUB)
+		&& _isDateBound(expression->leftExpression)
+		&& evaluateConstant(expression->rightExpression, &minutes);
+}
+
+/**
+ * Whether the planner knows how to meet a constraint. A greedy planner meets
+ * a limit while it places each session, so it admits an upper limit on the
+ * topics or the load of a period, and an upper limit on the date when a goal
+ * or a topic is finished.
+ */
+static bool _isPlannable(const Expression * constraint) {
+	if (constraint->type != COMPARE_LESS && constraint->type != COMPARE_LESS_EQUAL) {
+		return false;
+	}
+	const Expression * left = constraint->leftExpression;
+	if (left->type != FACTOR_EXPRESSION || left->factor->type != INVOCATION_FACTOR) {
+		return false;
+	}
+	const char * function = left->factor->function;
+	if (strcmp(function, "finish") == 0) {
+		return _isDateBound(constraint->rightExpression);
+	}
+	int limit = 0;
+	return (strcmp(function, "topics") == 0 || strcmp(function, "load") == 0)
+		&& evaluateConstant(constraint->rightExpression, &limit);
+}
+
+/**
+ * The time when a day declared with an amount of time begins: the "start"
+ * of the plan, or 09:00 if it doesn't set one.
+ */
+static int _planStart(const Declaration * plan) {
+	if (plan == NULL) {
+		return DEFAULT_DAY_START;
+	}
+	for (const AttributeList * node = plan->plan; node != NULL; node = node->next) {
+		const Expression * value = node->attribute->values->expression;
+		if (strcmp(node->attribute->name, "start") == 0
+				&& value->type == FACTOR_EXPRESSION && value->factor->type == CONSTANT_FACTOR) {
+			return value->factor->constant->time;
+		}
+	}
+	return DEFAULT_DAY_START;
+}
+
+/**
+ * Validates the estimated time of every topic that contains others, from
+ * the outermost ones.
+ */
+static void _validateEstimates(const DeclarationList * declarations) {
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		int minutes = 0;
+		if (node->declaration->type == TOPIC_DECLARATION) {
+			_estimatedOf(node->declaration->topic, &minutes);
+		}
+		else if (node->declaration->type == GOAL_DECLARATION) {
+			for (const MemberList * member = node->declaration->goal->members; member != NULL; member = member->next) {
+				if (member->member->type == TOPIC_MEMBER) {
+					_estimatedOf(member->member->topic, &minutes);
+				}
+			}
+		}
+	}
+}
+
+/**
+ * A program without a plan is only validated, like a library. A program
+ * with a plan is scheduled, so it declares everything the planner needs:
+ * where the plan begins, when there is time to study, the deadline of every
+ * goal, and the time of every topic that doesn't contain others (the time of
+ * the rest is the sum of their subtopics).
+ */
+static void _validatePlanRequirements(const SymbolTable * table, const DeclarationList * declarations) {
+	const Declaration * plan = _findDeclaration(declarations, PLAN_DECLARATION);
+	if (plan == NULL) {
+		return;
+	}
+	bool hasFrom = false;
+	for (const AttributeList * node = plan->plan; node != NULL; node = node->next) {
+		hasFrom = hasFrom || strcmp(node->attribute->name, "from") == 0;
+	}
+	if (!hasFrom) {
+		reportSemanticError(plan->position, "el plan necesita 'from', la fecha en que empieza.");
+	}
+	const Declaration * availability = _findDeclaration(declarations, AVAILABILITY_DECLARATION);
+	if (availability == NULL) {
+		reportSemanticError(plan->position, "para planificar hace falta un bloque 'availability'.");
+	}
+	else {
+		const int dayStart = _planStart(plan);
+		for (const SlotList * node = availability->availability->slots; node != NULL; node = node->next) {
+			const Period * period = node->slot->periods->period;
+			int amount = 0;
+			if (period->type == SINGLE_PERIOD && evaluateConstant(period->amount, &amount) && 24 * 60 < dayStart + amount) {
+				char startText[6];
+				formatTime(dayStart, startText);
+				reportSemanticError(node->slot->position,
+					"el día empieza a las %s (el 'start' del plan), así que '%s' pasaría la medianoche.", startText, node->slot->day);
+			}
+		}
+	}
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind == GOAL_SYMBOL && _findAttribute(symbol->goal->members, "due") == NULL) {
+			reportSemanticError(symbol->position,
+				"el objetivo '%s' necesita 'due' (su fecha límite) para poder planificarse.", symbol->name);
+		}
+		else if (symbol->kind == TOPIC_SYMBOL && !_hasSubtopics(symbol->topic)
+				&& _findAttribute(symbol->topic->members, "estimated") == NULL) {
+			reportSemanticError(symbol->position,
+				"el tema '%s' necesita 'estimated' (su tiempo de estudio) para poder planificarse.", symbol->name);
+		}
+	}
+	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
+		if (node->declaration->type != CONSTRAINTS_DECLARATION) {
+			continue;
+		}
+		for (const ConstraintList * constraint = node->declaration->constraints; constraint != NULL; constraint = constraint->next) {
+			if (!_isPlannable(constraint->constraint)) {
+				reportSemanticError(constraint->constraint->position,
+					"con un plan, cada restricción tiene la forma 'topics(day) <= 2', 'load(week) <= 20h' o 'finish(goal) <= deadline(goal) - 7d'.");
+			}
+		}
+	}
+}
+
+/**
  * A fixed session is placed exactly where it's declared, so it has to fall
  * inside the availability of its day of the week. This check only runs on a
  * program without other errors, because it relies on valid values.
  */
 static void _validateFixedSessions(const SymbolTable * table, const DeclarationList * declarations) {
-	const Availability * availability = NULL;
-	for (const DeclarationList * node = declarations; node != NULL && availability == NULL; node = node->next) {
-		if (node->declaration->type == AVAILABILITY_DECLARATION) {
-			availability = node->declaration->availability;
-		}
-	}
+	const Declaration * availability = _findDeclaration(declarations, AVAILABILITY_DECLARATION);
 	if (availability == NULL) {
 		return;
 	}
-	WeeklyAvailability * weeklyAvailability = createWeeklyAvailability(availability, DEFAULT_DAY_START);
+	const int dayStart = _planStart(_findDeclaration(declarations, PLAN_DECLARATION));
+	WeeklyAvailability * weeklyAvailability = createWeeklyAvailability(availability->availability, dayStart);
 	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
 		if (symbol->kind != TOPIC_SYMBOL) {
 			continue;
@@ -1196,6 +1417,8 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_validateInvocations(table, program->declarations);
 	_validateRules(table, program->declarations);
 	if (semanticErrorCount() == 0) {
+		_validateEstimates(program->declarations);
+		_validatePlanRequirements(table, program->declarations);
 		_validateFixedSessions(table, program->declarations);
 	}
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {

@@ -1,0 +1,1 @@
+goal TLA { topic A { estimated: 5h; topic B { estimated: 2h; } topic C { estimated: 2h; } } }

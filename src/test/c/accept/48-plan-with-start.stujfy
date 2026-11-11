@@ -1,0 +1,4 @@
+// Con start a las 18:00, el domingo va de 18:00 a 20:00, y la sesión fija entra.
+availability { sunday: 2h; }
+goal TLA { due: 2026-12-05; topic A { estimated: 2h; fixed: 2026-11-22, 18:30, 1h; } }
+plan { from: 2026-09-01; start: 18:00; }

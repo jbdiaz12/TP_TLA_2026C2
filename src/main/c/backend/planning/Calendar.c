@@ -45,6 +45,20 @@ void formatDate(const int date, char * buffer) {
 	sprintf(buffer, "%04d-%02d-%02d", date / 10000, (date / 100) % 100, date % 100);
 }
 
+void formatDuration(const int minutes, char * buffer) {
+	const int hours = minutes / 60;
+	const int rest = minutes % 60;
+	if (0 < hours && 0 < rest) {
+		sprintf(buffer, "%dh%dm", hours, rest);
+	}
+	else if (0 < hours) {
+		sprintf(buffer, "%dh", hours);
+	}
+	else {
+		sprintf(buffer, "%dm", rest);
+	}
+}
+
 void formatTime(const int minutes, char * buffer) {
 	sprintf(buffer, "%02d:%02d", minutes / 60, minutes % 60);
 }

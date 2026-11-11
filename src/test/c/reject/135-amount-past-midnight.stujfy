@@ -1,0 +1,2 @@
+availability { monday: 8h; }
+plan { from: 2026-09-01; start: 18:00; }

@@ -1,1 +1,2 @@
+availability { weekdays: 18:00 .. 21:00; }
 plan { from: 2026-09-01; until: 2026-12-20; strategy: priorityFirst; }
