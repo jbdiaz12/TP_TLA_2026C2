@@ -1,0 +1,4 @@
+include <metodos>
+availability { every: 1h; }
+goal TLA { due: 2026-12-05; topic A { estimated: 4h; method: Pomodoro(); } }
+plan { from: 2026-09-01; }

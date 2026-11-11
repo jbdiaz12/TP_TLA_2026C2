@@ -1,0 +1,4 @@
+availability { every: 2h; }
+constraints { topics(day) <= 1; }
+goal TLA { due: 2026-09-01; topic A { estimated: 1h; } topic B { estimated: 1h; } }
+plan { from: 2026-09-01; }

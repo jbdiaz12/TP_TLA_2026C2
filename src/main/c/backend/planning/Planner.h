@@ -6,7 +6,10 @@
 #include "../../support/type/CompilationStatus.h"
 #include "../../support/type/ModuleDestructor.h"
 #include "../semantic-analysis/SymbolTable.h"
+#include "Assignment.h"
+#include "Calendar.h"
 #include "MethodExpansion.h"
+#include "WeeklyAvailability.h"
 #include "PlanningError.h"
 #include "Work.h"
 

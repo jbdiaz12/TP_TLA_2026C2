@@ -1,0 +1,4 @@
+// B depende de A y puede empezar el mismo día, después de que A termina.
+availability { every: 2h; }
+goal TLA { due: 2026-09-01; topic A { estimated: 1h; } topic B { requires: A; estimated: 1h; } }
+plan { from: 2026-09-01; }

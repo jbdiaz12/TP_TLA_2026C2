@@ -1,0 +1,6 @@
+// Con priorityFirst, Fisica va primero por su prioridad y TLA no llega a su fecha.
+scale prioridad { baja < alta }
+availability { every: 1h; }
+goal Fisica { due: 2026-09-10; priority: alta; topic B { estimated: 2h; } }
+goal TLA { due: 2026-09-02; priority: baja; topic A { estimated: 2h; } }
+plan { from: 2026-09-01; strategy: priorityFirst; }

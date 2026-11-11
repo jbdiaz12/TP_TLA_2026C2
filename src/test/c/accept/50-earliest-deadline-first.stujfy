@@ -1,0 +1,5 @@
+// Fisica está declarada primero, pero TLA vence antes y va primero.
+availability { every: 1h; }
+goal Fisica { due: 2026-09-10; topic B { estimated: 2h; } }
+goal TLA { due: 2026-09-02; topic A { estimated: 2h; } }
+plan { from: 2026-09-01; }

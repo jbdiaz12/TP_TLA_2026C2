@@ -1,0 +1,3 @@
+availability { every: 1h; }
+goal TLA { due: 2026-09-03; topic A { estimated: 2h; } topic B { requires: A; estimated: 2h; } }
+plan { from: 2026-09-01; }

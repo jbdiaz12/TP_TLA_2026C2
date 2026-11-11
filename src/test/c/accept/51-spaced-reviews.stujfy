@@ -1,0 +1,4 @@
+include <metodos>
+availability { every: 1h; }
+goal Ingles { due: 2026-10-30; topic Vocabulario { estimated: 2h30m; method: Espaciado(); } }
+plan { from: 2026-09-01; }
