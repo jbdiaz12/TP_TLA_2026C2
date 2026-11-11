@@ -1,0 +1,3 @@
+// El domingo usa su propia ventana, más específica que "every".
+availability { every: 2h; sunday: 10:00 .. 13:00; }
+goal TLA { topic A { fixed: 2026-11-22, 11:30, 1h; } }

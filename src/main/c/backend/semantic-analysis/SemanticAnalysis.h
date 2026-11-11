@@ -2,6 +2,8 @@
 #define SEMANTIC_ANALYSIS_HEADER
 
 #include "../../frontend/syntactic-analysis/AbstractSyntaxTree.h"
+#include "../planning/Calendar.h"
+#include "../planning/WeeklyAvailability.h"
 #include "../../support/logging/Logger.h"
 #include "../../support/type/CompilationStatus.h"
 #include "../../support/type/ModuleDestructor.h"

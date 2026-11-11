@@ -68,6 +68,7 @@ static void _validatePeriods(const Slot * slot, const Scope * scope);
 static void _validateBlocks(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateConstraints(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateCycles(const SymbolTable * table);
+static void _validateFixedSessions(const SymbolTable * table, const DeclarationList * declarations);
 static void _validateInvocations(const SymbolTable * table, const DeclarationList * declarations);
 static const Symbol * _scaleOfAttribute(const SymbolTable * table, const SymbolKind kind, const char * name);
 static void _validateRules(const SymbolTable * table, const DeclarationList * declarations);
@@ -602,6 +603,69 @@ static void _validateConstraints(const SymbolTable * table, const DeclarationLis
 }
 
 /**
+ * A fixed session is placed exactly where it's declared, so it has to fall
+ * inside the availability of its day of the week. This check only runs on a
+ * program without other errors, because it relies on valid values.
+ */
+static void _validateFixedSessions(const SymbolTable * table, const DeclarationList * declarations) {
+	const Availability * availability = NULL;
+	for (const DeclarationList * node = declarations; node != NULL && availability == NULL; node = node->next) {
+		if (node->declaration->type == AVAILABILITY_DECLARATION) {
+			availability = node->declaration->availability;
+		}
+	}
+	if (availability == NULL) {
+		return;
+	}
+	WeeklyAvailability * weeklyAvailability = createWeeklyAvailability(availability, DEFAULT_DAY_START);
+	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
+		if (symbol->kind != TOPIC_SYMBOL) {
+			continue;
+		}
+		for (const MemberList * node = symbol->topic->members; node != NULL; node = node->next) {
+			if (node->member->type != ATTRIBUTE_MEMBER || strcmp(node->member->attribute->name, "fixed") != 0) {
+				continue;
+			}
+			const Attribute * attribute = node->member->attribute;
+			const Expression * date = attribute->values->expression;
+			const Expression * time = attribute->values->next->expression;
+			int duration = 0;
+			if (date->type != FACTOR_EXPRESSION || date->factor->type != CONSTANT_FACTOR
+					|| time->type != FACTOR_EXPRESSION || time->factor->type != CONSTANT_FACTOR
+					|| !evaluateConstant(attribute->values->next->next->expression, &duration)) {
+				continue;
+			}
+			const int start = time->factor->constant->time;
+			const int weekday = weekdayOf(toDayNumber(date->factor->constant->date));
+			const DayAvailability * day = &weeklyAvailability->days[weekday];
+			bool fits = false;
+			for (int k = 0; k < day->count && !fits; ++k) {
+				fits = day->windows[k].start <= start && start + duration <= day->windows[k].end;
+			}
+			if (fits) {
+				continue;
+			}
+			char dateText[11];
+			char startText[6];
+			char endText[6];
+			formatDate(date->factor->constant->date, dateText);
+			formatTime(start, startText);
+			formatTime(start + duration, endText);
+			if (day->count == 0) {
+				reportSemanticError(attribute->position,
+					"la sesión fija del %s cae un %s, y ese día no hay disponibilidad.", dateText, weekdayName(weekday));
+			}
+			else {
+				reportSemanticError(attribute->position,
+					"la sesión fija del %s, de %s a %s, queda fuera de la disponibilidad del %s.",
+					dateText, startText, endText, weekdayName(weekday));
+			}
+		}
+	}
+	destroyWeeklyAvailability(weeklyAvailability);
+}
+
+/**
  * Validates every invocation of a method: the ones that assign a method to a
  * topic directly, and the actions of the rules.
  */
@@ -1131,6 +1195,9 @@ CompilationStatus executeSemanticAnalysis(Program * program) {
 	_validateConstraints(table, program->declarations);
 	_validateInvocations(table, program->declarations);
 	_validateRules(table, program->declarations);
+	if (semanticErrorCount() == 0) {
+		_validateFixedSessions(table, program->declarations);
+	}
 	for (const DeclarationList * node = program->declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == METHOD_DECLARATION) {
 			_validateMethod(table, program->declarations, node->declaration->method);

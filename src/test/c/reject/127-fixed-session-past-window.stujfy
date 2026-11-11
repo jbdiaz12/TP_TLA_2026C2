@@ -1,0 +1,2 @@
+availability { weekdays: 18:00 .. 21:00; }
+goal TLA { topic A { fixed: 2026-11-20, 20:00, 90m; } }
