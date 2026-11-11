@@ -53,6 +53,15 @@ typedef struct {
 const char * describeType(const Type type);
 
 /**
+ * Computes the value of an expression made only of constants and arithmetic
+ * (e.g., "2 * 90m"), as an integer or an amount of minutes. It's meant for
+ * expressions already checked as integers or durations. It returns false
+ * when the value depends on something that isn't known while compiling, or
+ * when the expression divides by zero, which it reports.
+ */
+bool evaluateConstant(const Expression * expression, int * value);
+
+/**
  * Builds a type that isn't a level.
  */
 Type simpleType(const TypeKind kind);

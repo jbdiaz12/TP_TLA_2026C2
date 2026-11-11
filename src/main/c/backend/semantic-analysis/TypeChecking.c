@@ -252,6 +252,49 @@ const char * describeType(const Type type) {
 	}
 }
 
+bool evaluateConstant(const Expression * expression, int * value) {
+	if (expression->type == FACTOR_EXPRESSION) {
+		const Factor * factor = expression->factor;
+		if (factor->type == PARENTHESIZED_FACTOR) {
+			return evaluateConstant(factor->expression, value);
+		}
+		if (factor->type != CONSTANT_FACTOR) {
+			return false;
+		}
+		switch (factor->constant->type) {
+			case DURATION_CONSTANT: *value = factor->constant->duration; return true;
+			case INTEGER_CONSTANT: *value = factor->constant->integer; return true;
+			default: return false;
+		}
+	}
+	int left = 0;
+	int right = 0;
+	switch (expression->type) {
+		case ARITHMETIC_ADD:
+		case ARITHMETIC_SUB:
+		case ARITHMETIC_MUL:
+		case ARITHMETIC_DIV:
+			if (!evaluateConstant(expression->leftExpression, &left) || !evaluateConstant(expression->rightExpression, &right)) {
+				return false;
+			}
+			break;
+		default:
+			return false;
+	}
+	switch (expression->type) {
+		case ARITHMETIC_ADD: *value = left + right; return true;
+		case ARITHMETIC_SUB: *value = left - right; return true;
+		case ARITHMETIC_MUL: *value = left * right; return true;
+		default:
+			if (right == 0) {
+				reportSemanticError(expression->position, "no se puede dividir por cero.");
+				return false;
+			}
+			*value = left / right;
+			return true;
+	}
+}
+
 Type simpleType(const TypeKind kind) {
 	return (Type) { .kind = kind, .scale = NULL };
 }

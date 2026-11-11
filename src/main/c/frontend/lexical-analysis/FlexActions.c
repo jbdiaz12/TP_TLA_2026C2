@@ -241,7 +241,8 @@ CompilationStatus _throw() {
 
 /**
  * Maps a date with the shape "yyyy-mm-dd" into a single integer with the shape
- * yyyymmdd, which preserves the chronological order of the dates.
+ * yyyymmdd, which preserves the chronological order of the dates. The date
+ * must exist in the calendar (e.g., "2026-02-30" doesn't).
  */
 CompilationStatus DateLexemeAction() {
 	Token * token = createToken(_lexicalAnalyzer, DATE);
@@ -249,6 +250,13 @@ CompilationStatus DateLexemeAction() {
 	int month = 0;
 	int day = 0;
 	sscanf(token->lexeme, "%d-%d-%d", &year, &month, &day);
+	const bool isLeapYear = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+	const int daysInMonth[] = { 31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+	if (month < 1 || 12 < month || day < 1 || daysInMonth[month - 1] < day) {
+		_reportLexicalError((YYLTYPE *) _lexicalAnalyzer->location, "la fecha '%s' no existe.", token->lexeme);
+		destroyToken(token);
+		return _throw();
+	}
 	token->semanticValue->integer = (10000 * year) + (100 * month) + day;
 	return _push(token, __FUNCTION__);
 }
@@ -425,12 +433,18 @@ CompilationStatus StringLexemeAction() {
 
 /**
  * Maps a time with the shape "hh:mm" into its amount of minutes since midnight.
+ * The time must exist in a day, from "00:00" to "23:59".
  */
 CompilationStatus TimeLexemeAction() {
 	Token * token = createToken(_lexicalAnalyzer, TIME);
 	int hours = 0;
 	int minutes = 0;
 	sscanf(token->lexeme, "%d:%d", &hours, &minutes);
+	if (23 < hours || 59 < minutes) {
+		_reportLexicalError((YYLTYPE *) _lexicalAnalyzer->location, "la hora '%s' no existe.", token->lexeme);
+		destroyToken(token);
+		return _throw();
+	}
 	token->semanticValue->integer = (60 * hours) + minutes;
 	return _push(token, __FUNCTION__);
 }

@@ -68,6 +68,12 @@ static void _validateConstraints(const SymbolTable * table, const DeclarationLis
 static void _validateCycles(const SymbolTable * table);
 static void _validateMemberAttributes(const MemberList * members, const char * const * allowed, const char * owner);
 static void _validatePlanAttributes(const AttributeList * list);
+static bool _hasType(const Attribute * attribute, const Expression * value, const TypeKind expected, const Scope * scope);
+static const Expression * _singleValue(const Attribute * attribute);
+static void _validateFixedSession(const Attribute * attribute, const Scope * scope);
+static void _validatePlanRange(const AttributeList * list);
+static void _validatePositiveDuration(const Attribute * attribute, const Expression * value);
+static void _validateValues(const Attribute * attribute, const Scope * scope);
 static void _visit(const SymbolTable * table, Visit * visits, const int count, const Symbol ** path, const int depth, const int index);
 static void _validateLevel(const SymbolTable * table, const Attribute * attribute);
 static void _validateLevels(const SymbolTable * table);
@@ -209,21 +215,172 @@ static void _validateAvailability(const Availability * availability) {
 }
 
 /**
+ * Whether the value of an attribute has the expected type. The value has no
+ * variables to read, and it can't call the functions of the domain.
+ */
+static bool _hasType(const Attribute * attribute, const Expression * value, const TypeKind expected, const Scope * scope) {
+	const Type type = typeOf(value, scope);
+	if (type.kind == ERROR_TYPE) {
+		return false;
+	}
+	if (type.kind != expected) {
+		const char * expectedDescription = describeType(simpleType(expected));
+		reportSemanticError(value->position, "'%s' lleva %s, pero este valor es %s.",
+			attribute->name, expectedDescription, describeType(type));
+		return false;
+	}
+	return true;
+}
+
+/**
+ * The value of an attribute that admits a single one, or NULL (after
+ * reporting it) if the attribute has more than one.
+ */
+static const Expression * _singleValue(const Attribute * attribute) {
+	if (attribute->values->next != NULL) {
+		reportSemanticError(attribute->position, "'%s' lleva un solo valor.", attribute->name);
+		return NULL;
+	}
+	return attribute->values->expression;
+}
+
+/**
+ * A fixed session is a date, the time when it starts and its duration, and
+ * the planner never moves it.
+ */
+static void _validateFixedSession(const Attribute * attribute, const Scope * scope) {
+	const ExpressionList * values = attribute->values;
+	if (values->next == NULL || values->next->next == NULL || values->next->next->next != NULL) {
+		reportSemanticError(attribute->position,
+			"'fixed' lleva una fecha, una hora y una duración (por ejemplo, 'fixed: 2026-11-20, 18:00, 90m;').");
+		return;
+	}
+	_hasType(attribute, values->expression, DATE_TYPE, scope);
+	_hasType(attribute, values->next->expression, TIME_TYPE, scope);
+	if (_hasType(attribute, values->next->next->expression, DURATION_TYPE, scope)) {
+		_validatePositiveDuration(attribute, values->next->next->expression);
+	}
+}
+
+/**
+ * When the plan sets both of its limits as dates, the end comes after the
+ * beginning.
+ */
+static void _validatePlanRange(const AttributeList * list) {
+	const Expression * from = NULL;
+	const Expression * until = NULL;
+	for (const AttributeList * node = list; node != NULL; node = node->next) {
+		const Attribute * attribute = node->attribute;
+		if (attribute->values->next != NULL) {
+			continue;
+		}
+		if (strcmp(attribute->name, "from") == 0) {
+			from = attribute->values->expression;
+		}
+		else if (strcmp(attribute->name, "until") == 0) {
+			until = attribute->values->expression;
+		}
+	}
+	const bool areDates = from != NULL && until != NULL
+		&& from->type == FACTOR_EXPRESSION && from->factor->type == CONSTANT_FACTOR && from->factor->constant->type == DATE_CONSTANT
+		&& until->type == FACTOR_EXPRESSION && until->factor->type == CONSTANT_FACTOR && until->factor->constant->type == DATE_CONSTANT;
+	if (areDates && until->factor->constant->date <= from->factor->constant->date) {
+		reportSemanticError(until->position, "'until' tiene que ser posterior a 'from'.");
+	}
+}
+
+/**
+ * A duration that measures time to study (or to rest) is greater than zero.
+ * Its value is known while compiling unless it reads a variable, such as the
+ * parameter of a method, whose value comes from each invocation.
+ */
+static void _validatePositiveDuration(const Attribute * attribute, const Expression * value) {
+	int minutes = 0;
+	if (evaluateConstant(value, &minutes) && minutes <= 0) {
+		reportSemanticError(value->position,
+			"'%s' tiene que ser una duración mayor que cero, pero da %d minutos.", attribute->name, minutes);
+	}
+}
+
+/**
+ * Validates the values of an attribute, according to its name. The levels
+ * and the requirements are validated on their own, and the methods together
+ * with their invocations.
+ */
+static void _validateValues(const Attribute * attribute, const Scope * scope) {
+	const char * name = attribute->name;
+	if (strcmp(name, "fixed") == 0) {
+		_validateFixedSession(attribute, scope);
+		return;
+	}
+	const bool isDate = (strcmp(name, "due") == 0 || strcmp(name, "from") == 0);
+	const bool isText = (strcmp(name, "description") == 0);
+	const bool isEstimation = (strcmp(name, "estimated") == 0);
+	const bool isEnd = (strcmp(name, "until") == 0);
+	const bool isStrategy = (strcmp(name, "strategy") == 0);
+	if (!isDate && !isText && !isEstimation && !isEnd && !isStrategy) {
+		return;
+	}
+	const Expression * value = _singleValue(attribute);
+	if (value == NULL) {
+		return;
+	}
+	const char * word = (value->type == FACTOR_EXPRESSION && value->factor->type == VARIABLE_FACTOR) ? value->factor->variable : NULL;
+	if (isStrategy) {
+		if (word == NULL || (strcmp(word, "earliestDeadlineFirst") != 0 && strcmp(word, "priorityFirst") != 0)) {
+			reportSemanticError(value->position, "'strategy' lleva earliestDeadlineFirst o priorityFirst.");
+		}
+	}
+	else if (isEnd && word != NULL && strcmp(word, "deadlines") == 0) {
+		return;
+	}
+	else if (isDate || isEnd) {
+		_hasType(attribute, value, DATE_TYPE, scope);
+	}
+	else if (isText) {
+		_hasType(attribute, value, STRING_TYPE, scope);
+	}
+	else if (_hasType(attribute, value, DURATION_TYPE, scope)) {
+		_validatePositiveDuration(attribute, value);
+	}
+}
+
+/**
  * Validates the attributes of every goal, topic and plan, and the days of
  * the availability.
  */
 static void _validateBlocks(const SymbolTable * table, const DeclarationList * declarations) {
+	const Scope scope = {
+		.table = table,
+		.variables = NULL,
+		.variableCount = 0,
+		.allowsDomainFunctions = false
+	};
 	for (const Symbol * symbol = table->first; symbol != NULL; symbol = symbol->next) {
 		if (symbol->kind == GOAL_SYMBOL) {
 			_validateMemberAttributes(symbol->goal->members, _GOAL_ATTRIBUTES, "de un objetivo");
+			for (const MemberList * member = symbol->goal->members; member != NULL; member = member->next) {
+				if (member->member->type == ATTRIBUTE_MEMBER) {
+					_validateValues(member->member->attribute, &scope);
+				}
+			}
 		}
 		else if (symbol->kind == TOPIC_SYMBOL) {
 			_validateMemberAttributes(symbol->topic->members, _TOPIC_ATTRIBUTES, "de un tema");
+			for (const MemberList * member = symbol->topic->members; member != NULL; member = member->next) {
+				if (member->member->type == ATTRIBUTE_MEMBER) {
+					_validateValues(member->member->attribute, &scope);
+				}
+			}
 		}
 	}
 	for (const DeclarationList * node = declarations; node != NULL; node = node->next) {
 		if (node->declaration->type == PLAN_DECLARATION) {
 			_validatePlanAttributes(node->declaration->plan);
+			for (const AttributeList * attribute = node->declaration->plan; attribute != NULL; attribute = attribute->next) {
+				_validateValues(attribute->attribute, &scope);
+			}
+			_validatePlanRange(node->declaration->plan);
 		}
 		else if (node->declaration->type == AVAILABILITY_DECLARATION) {
 			_validateAvailability(node->declaration->availability);
